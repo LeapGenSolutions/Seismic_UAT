@@ -20,7 +20,6 @@ import {
   Mail,
   Calendar,
   ExternalLink,
-  FileText,
 } from "lucide-react";
 import AdvancedSearch from "../components/search/AdvancedSearch";
 import { format, parseISO } from "date-fns";
@@ -30,6 +29,7 @@ import { fetchAppointmentDetails } from "../redux/appointment-actions";
 import DoctorMultiSelect from "../components/DoctorMultiSelect";
 import { Link } from "wouter";
 import { PageNavigation } from "../components/ui/page-navigation";
+import CreateAppointmentModal from "../components/appointments/CreateAppointmentModal";
 
 function Patients() {
   const dispatch = useDispatch();
@@ -49,6 +49,17 @@ function Patients() {
     endDate: today,
   });
   const [isDoctorDropdownOpen, setIsDoctorDropdownOpen] = useState(false);
+
+
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  
+  const refreshAllData = () => {
+    dispatch(fetchPatientsDetails());
+    if (appointmentFilters.selectedDoctors.length > 0) {
+      dispatch(fetchAppointmentDetails(appointmentFilters.selectedDoctors));
+    }
+  };
 
   useEffect(() => {
     if (patients.length === 0) {
@@ -174,12 +185,18 @@ function Patients() {
   return (
     <div className="space-y-6">
       <PageNavigation 
-        //title="Patients"
-        //subtitle="View and manage patient records"
         showDate={false}
       />
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Patients</h1>
+
+        <Button
+          onClick={() => setShowAddModal(true)}
+          className="bg-blue-600 text-white"
+        >
+          + Add
+        </Button>
       </div>
 
       <Card>
@@ -310,9 +327,6 @@ function Patients() {
                     <TableCell>{patient?.doctorName}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon">
-                          <FileText className="w-4 h-4" />
-                        </Button>
                         <Link href={`/patients/${patient?.patient_id}`}>
                           <Button variant="ghost" size="icon">
                             <ExternalLink className="w-4 h-4" />
@@ -327,6 +341,18 @@ function Patients() {
           </Table>
         </CardContent>
       </Card>
+
+      {showAddModal && (
+        <CreateAppointmentModal
+          username={""}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            refreshAllData();
+            setShowAddModal(false);
+          }}
+        />
+      )}
+
     </div>
   );
 }
