@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ExternalLink, CalendarDays, Clock, User, } from "lucide-react";
+import { ChevronDown, ExternalLink, CalendarDays, Clock, User } from "lucide-react";
 import { navigate } from "wouter/use-browser-location";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { bgColors } from "../constants/colors";
 import { fetchDoctors } from "../redux/doctors-actions";
 
+// --- Utility helpers ---
 const getColorForDoctor = (userID) => {
   let hash = 0;
   for (let i = 0; i < userID.length; i++) {
@@ -16,6 +17,7 @@ const getColorForDoctor = (userID) => {
   }
   return bgColors[Math.abs(hash) % bgColors.length];
 };
+
 const normalizeDate = (d) => new Date(new Date(d).toDateString());
 
 const getInitials = (name) => {
@@ -24,6 +26,7 @@ const getInitials = (name) => {
   return (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
 };
 
+// --- Card component ---
 const CallHistoryCard = ({ entry }) => (
   <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-6 py-4 flex justify-between items-start flex-wrap gap-4">
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 text-sm text-gray-800">
@@ -41,16 +44,30 @@ const CallHistoryCard = ({ entry }) => (
       </div>
       <div className="flex items-center gap-2">
         <Clock className="w-4 h-4 text-gray-500" />
-        <span className="font-semibold">Start Time:</span> {entry.startTime?.split("T")[1]?.slice(0, 5)}
+        <span className="font-semibold">Start Time:</span>{" "}
+        {entry.startTime
+          ? new Date(entry.startTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : ""}
       </div>
       <div className="flex items-center gap-2">
         <Clock className="w-4 h-4 text-gray-500" />
-        <span className="font-semibold">End Time:</span> {entry.endTime?.split("T")[1]?.slice(0, 5)}
+        <span className="font-semibold">End Time:</span>{" "}
+        {entry.endTime
+          ? new Date(entry.endTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : ""}
       </div>
     </div>
     <div className="flex-shrink-0 mt-2 md:mt-0">
       <button
-        onClick={() => navigate(`/post-call/${entry.appointmentID}?username=${entry.userID}`)}
+        onClick={() =>
+          navigate(`/post-call/${entry.appointmentID}?username=${entry.userID}`)
+        }
         className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm"
       >
         <ExternalLink className="w-4 h-4" />
@@ -68,20 +85,20 @@ function CallHistory() {
   const [allDoctors, setAllDoctors] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
+
   const doctorsCallHistoryData = useSelector((state) => state.doctors?.doctors || []);
-  const dispatch  = useDispatch();
-
-  useEffect(() => {
-    if(doctorsCallHistoryData.length === 0){
-      dispatch(fetchDoctors());
-    }
-    // eslint-disable-next-line
-  }, []);
-
+  const dispatch = useDispatch();
   const dropdownRef = useRef(null);
   const myEmail = useSelector((state) => state.me.me.email);
 
-  const { data: callHistoryData, refetch } = useQuery({
+  // --- Fetch doctors list ---
+  useEffect(() => {
+    if (doctorsCallHistoryData.length === 0) {
+      dispatch(fetchDoctors());
+    }
+  }, [dispatch, doctorsCallHistoryData.length]);
+
+  const { data: callHistoryData } = useQuery({
     queryKey: ["call-history", selectedDoctors],
     queryFn: () => fetchCallHistory(selectedDoctors),
     enabled: selectedDoctors.length > 0,
@@ -94,34 +111,10 @@ function CallHistory() {
   }, [doctorsCallHistoryData]);
 
   useEffect(() => {
-    setSelectedDoctors([myEmail]);
+    if (myEmail) setSelectedDoctors([myEmail]);
   }, [myEmail]);
 
-  useEffect(() => {
-    if (selectedDoctors.length > 0) {
-      refetch();
-    }
-  }, [selectedDoctors, refetch]);
-
-  useEffect(() => {
-    if (!callHistoryData) return;
-    const filtered = callHistoryData.filter((item) => {
-      if (!item.patientName || item.patientName.toLowerCase() === "unknown") return false;
-      const date = normalizeDate(item.startTime);
-      const doctorMatch =
-        selectedDoctors.length === 0 || selectedDoctors.includes(item.userID);
-      const patientMatch =
-        !patientSearch ||
-        item.patientName.toLowerCase().includes(patientSearch.toLowerCase());
-      const dateMatch =
-        (!startDate || date >= normalizeDate(startDate)) &&
-        (!endDate || date <= normalizeDate(endDate));
-      return doctorMatch && patientMatch && dateMatch;
-    });
-    setFilteredData(filtered);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callHistoryData]);
-
+  // --- Dropdown close on outside click ---
   useEffect(() => {
     const handleClick = (e) => {
       if (!dropdownRef.current?.contains(e.target)) setShowDoctorDropdown(false);
@@ -130,34 +123,114 @@ function CallHistory() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // --- Filtering logic (exact normalized match) ---
+  const applyFilters = (patientValue = patientSearch, dataSource = callHistoryData) => {
+    if (!dataSource) return;
+
+    // Remove invisible/unicode/space characters
+    const normalize = (text) =>
+      text
+        ?.toLowerCase()
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\s+/g, "")
+        .trim();
+
+    const query = normalize(patientValue);
+
+    let filtered = dataSource.filter((item) => {
+      if (!item.patientName || item.patientName.toLowerCase() === "unknown")
+        return false;
+
+      const cleanName = normalize(item.patientName);
+      const doctorMatch =
+        selectedDoctors.length === 0 || selectedDoctors.includes(item.userID);
+
+      const date = normalizeDate(item.startTime);
+      const dateMatch =
+        (!startDate || date >= normalizeDate(startDate)) &&
+        (!endDate || date <= normalizeDate(endDate));
+
+      // Exact normalized match only
+      const patientMatch = !query ? true : cleanName === query;
+
+      return doctorMatch && patientMatch && dateMatch;
+    });
+
+    // Sort newest first
+    filtered.sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+
+    setFilteredData(filtered);
+  };
+
+  // --- Initial filter once data loads ---
+  useEffect(() => {
+    if (callHistoryData && callHistoryData.length > 0) {
+      applyFilters();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callHistoryData]);
+
+  // --- Submit: fetch fresh data then filter ---
+  const handleSubmit = async () => {
+    try {
+      const freshData = await fetchCallHistory(selectedDoctors);
+      applyFilters(patientSearch, freshData);
+    } catch (err) {
+      console.error("Error refetching call history:", err);
+    }
+  };
+
+  const handleReset = async () => {
+    setStartDate(null);
+    setEndDate(null);
+    setPatientSearch("");
+    try {
+      const freshData = await fetchCallHistory(selectedDoctors);
+      applyFilters("", freshData);
+    } catch (err) {
+      console.error("Error resetting filters:", err);
+    }
+  };
+
+  // --- Dropdown helpers ---
   const getDropdownLabel = () =>
     !selectedDoctors.length
       ? "Dr Name"
       : selectedDoctors.length === allDoctors.length
-        ? "All Doctors"
-        : `${selectedDoctors.length} selected`;
+      ? "All Doctors"
+      : `${selectedDoctors.length} selected`;
 
   const toggleDoctor = (id) =>
     setSelectedDoctors((prev) =>
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
     );
 
-  const handleSubmit = () => {
-    refetch();
-  }
-  
+  // --- Allow Enter key to trigger filter ---
+  const handleKeyDown = async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const freshData = await fetchCallHistory(selectedDoctors);
+      applyFilters(patientSearch, freshData);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Call History Overview</h1>
+        <h1 className="text-xl font-semibold text-gray-900">
+          Call History Overview
+        </h1>
         <p className="text-sm text-gray-500">
           Review previous consultations filtered by doctor, date, and patient.
         </p>
       </div>
+
+      {/* --- Filters --- */}
       <div className="flex flex-wrap items-end gap-4">
+        {/* Doctor dropdown */}
         <div className="flex flex-col">
-          <label className="text-xs font-medium text-gray-600 mb-1"></label>
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDoctorDropdown((prev) => !prev)}
@@ -192,7 +265,9 @@ function CallHistory() {
                 </div>
                 {allDoctors
                   .filter((doc) =>
-                    doc?.fullName?.toLowerCase().includes(searchTerm.toLowerCase())
+                    doc?.fullName
+                      ?.toLowerCase()
+                      .includes(searchTerm.toLowerCase())
                   )
                   .map((doc) => {
                     const initials = getInitials(doc.fullName);
@@ -221,9 +296,9 @@ function CallHistory() {
             )}
           </div>
         </div>
+
         {/* Date Range Picker */}
         <div className="flex flex-col">
-          <label className="text-xs font-medium text-gray-600 mb-1"></label>
           <DatePicker
             selectsRange
             startDate={startDate}
@@ -238,7 +313,17 @@ function CallHistory() {
             className="h-10 border border-gray-300 rounded-md px-4 text-sm w-64"
           />
         </div>
-        <input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Search patient name" className="h-10 border rounded-md px-4 text-sm w-64" />
+
+        {/* Patient Search */}
+        <input
+          value={patientSearch}
+          onChange={(e) => setPatientSearch(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search patient name"
+          className="h-10 border rounded-md px-4 text-sm w-64"
+        />
+
+        {/* Buttons */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleSubmit}
@@ -247,19 +332,15 @@ function CallHistory() {
             Submit
           </button>
           <button
-            onClick={() => {
-              setStartDate(null);
-              setEndDate(null);
-              setPatientSearch("");
-              setSelectedDoctors([]);
-              setFilteredData([]);
-            }}
+            onClick={handleReset}
             className="text-sm text-gray-500 hover:underline"
           >
             Reset Filters
           </button>
         </div>
       </div>
+
+      {/* --- Results --- */}
       <div className="space-y-3">
         {filteredData.length > 0 ? (
           filteredData.map((entry) => (
@@ -274,4 +355,5 @@ function CallHistory() {
     </div>
   );
 }
+
 export default CallHistory
