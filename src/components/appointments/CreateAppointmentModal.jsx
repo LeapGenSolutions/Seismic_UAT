@@ -6,7 +6,6 @@ import { fetchPatientsDetails } from "../../redux/patient-actions";
 import { useToast } from "../../hooks/use-toast";
 import UnsavedChangesModal from "../UnsavedChangesModal";
 import { Calendar, User2, Clock, ChevronDown, Search } from "lucide-react";
-import { v5 as uuidv5 } from "uuid";
 
 const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
   const { toast } = useToast();
@@ -17,20 +16,15 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
   }, [dispatch]);
 
   const loggedInDoctor = useSelector((state) => state.me.me);
+  console.log("LOGGED IN DOCTOR FROM REDUX:", loggedInDoctor);
   const patientsList = useSelector((state) => state.patients.patients);
   const [existingPatient, setExistingPatient] = useState(null);
 
-  const resolvedDoctorName = loggedInDoctor?.name || "Dr. Unknown";
+  const resolvedDoctorName = loggedInDoctor?.doctor_name;
   const resolvedDoctorEmail =
-    loggedInDoctor?.email?.toLowerCase() || username?.toLowerCase() || "";
-  const resolvedSpecialization =
-    loggedInDoctor?.specialization?.trim() || "General Medicine";
-  const resolvedDoctorId =
-    loggedInDoctor?.oid?.replace(/-/g, "") ||
-    uuidv5(
-      resolvedDoctorName,
-      "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-    ).replace(/-/g, "");
+  loggedInDoctor?.doctor_email || loggedInDoctor?.email;
+  const resolvedSpecialization = loggedInDoctor?.specialization;
+  const resolvedDoctorId = loggedInDoctor?.doctor_id;
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -210,9 +204,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         gender: formData.gender,
         mrn: formData.mrn,
         ehr: formData.ehr,
-        doctor_name: resolvedDoctorName.startsWith("Dr.")
-          ? resolvedDoctorName
-          : `Dr. ${resolvedDoctorName}`,
+        doctor_name: resolvedDoctorName,
         doctor_id: resolvedDoctorId,
         doctor_email: resolvedDoctorEmail,
         specialization: resolvedSpecialization,
