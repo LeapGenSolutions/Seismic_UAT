@@ -169,7 +169,6 @@ const dob = rawDob
               "clusters",
               "doctor notes",
               "emotional connect",
-              "doctor feedback",
             ].map((tab) => (
               <button
                 key={tab}
@@ -222,10 +221,6 @@ const dob = rawDob
                 selectedAppointment.patient_Id
               }
             />
-          )}
-
-          {docTab === "doctor feedback" && (
-            <PostCallFeedback username={username} appointmentId={callId} />
           )}
         </CardContent>
       </Card>
