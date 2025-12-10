@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { BACKEND_URL } from "../../constants";
 import { createAppointment } from "../../api/appointment";
 import { fetchPatientsDetails } from "../../redux/patient-actions";
 import { useToast } from "../../hooks/use-toast";
 import UnsavedChangesModal from "../UnsavedChangesModal";
-import { Calendar, User2, Clock, ChevronDown } from "lucide-react";
+import { Calendar, User2, Clock } from "lucide-react";
+import SeismicTimeDropdown from "./SeismicTimeDropdown";
 
 const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
   const { toast } = useToast();
@@ -175,6 +176,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Mark required fields as touched
     setTouched((prev) => {
       const next = { ...prev };
       requiredFields.forEach((f) => (next[f] = true));
@@ -189,64 +191,35 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
       });
       return;
     }
+
+    // Date validation (past dates not allowed)
     try {
       const today = new Date();
-      today.setSeconds(0, 0);
+      today.setHours(0, 0, 0, 0);
 
-      // Parse selected date
       const [Y, M, D] = formData.appointment_date.split("-").map(Number);
       const selectedDate = new Date(Y, (M || 1) - 1, D || 1);
       selectedDate.setHours(0, 0, 0, 0);
 
-      const todayAtMidnight = new Date();
-      todayAtMidnight.setHours(0, 0, 0, 0);
-
-      if (selectedDate < todayAtMidnight) {
+      if (selectedDate < today) {
         toast({
-          title: "Cannot update appointment",
-          description: "Appointment Date must be in the future.",
+          title: "Cannot create appointment",
+          description: "Appointment date must be today or in the future.",
           variant: "destructive",
         });
 
         setErrors((prev) => ({
           ...prev,
-          appointment_date: "Appointment Date must be in the future.",
+          appointment_date: "Appointment date must be today or in the future.",
         }));
         return;
       }
-      if (selectedDate.getTime() === todayAtMidnight.getTime()) {
-        const timeStr = formData.time;
-        const parsedTime = new Date(`1970-01-01 ${timeStr}`);
-        if (!isNaN(parsedTime.getTime())) {
-          const selectedDateTime = new Date();
-          selectedDateTime.setHours(
-            parsedTime.getHours(),
-            parsedTime.getMinutes(),
-            0,
-            0
-          );
-
-          if (selectedDateTime <= today) {
-            toast({
-              title: "Invalid time",
-              description: (
-                <span style={{ color: "#b91c1c" }}> 
-                  Appointment Time must be in the future.
-                </span>
-              ),
-              variant: "destructive",
-            });
-
-            setErrors((prev) => ({
-              ...prev,
-              time: "Appointment Time must be in the future.",
-            }));
-            return;
-          }
-        }
-      }
+      // ✅ For today: we allow ANY time (past or future) — no time-based block here
     } catch {
+      // If date parsing fails, it will already be caught by required field validation
     }
+
+    // MRN uniqueness check for new patients
     if (!existingPatient && formData.mrn?.trim()) {
       const enteredMRN = formData.mrn.trim().toLowerCase();
 
@@ -269,7 +242,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         }));
         setTouched((prev) => ({ ...prev, mrn: true }));
 
-        return; 
+        return;
       }
     }
 
@@ -277,12 +250,13 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
 
     try {
       let patient_id, practice_id;
+
       if (existingPatient) {
         const d = extractDetails(existingPatient);
         patient_id = existingPatient.patient_id || d.patient_id;
         practice_id = existingPatient.practice_id || d.practice_id;
-      }
-      else {
+      } else {
+        // Create new patient
         const res = await fetch(`${BACKEND_URL}api/patients/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -356,7 +330,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
     } catch (err) {
       toast({
         title: "Error creating appointment",
-        description: err?.message,
+        description: err?.message || "Something went wrong.",
         variant: "destructive",
       });
     } finally {
@@ -386,7 +360,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
           mr-16 mt-10 mb-6 
           overflow-y-auto h-full 
           flex flex-col 
-          border border-gray-200
+          border border-black-200
         "
         onClick={(e) => e.stopPropagation()}
       >
@@ -399,20 +373,22 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
             ×
           </button>
         </div>
+
         <div className="flex h-full">
-          <div className="w-[40%] border-r border-gray-200 p-4 overflow-y-auto">
+          {/* LEFT: Existing Patient Search */}
+          <div className="w-[40%] border-r border-black-200 p-4 overflow-y-auto">
             <h3 className="text-md font-semibold text-blue-700 mb-3">
               Find Existing Patient
             </h3>
             <div className="mb-3">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
+              <label className="block text-xs font-semibold text-black-600 mb-1">
                 Search by Patient Name
               </label>
               <input
                 value={nameSearchTerm}
                 onChange={handleNameInputChange}
                 placeholder="Start typing name..."
-                className="border rounded-md w-full p-2 text-sm border-gray-300"
+                className="border rounded-md w-full p-2 text-sm border-black-300"
               />
             </div>
             {nameMatches.length > 0 && (
@@ -452,7 +428,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                         {displayName || "Unnamed Patient"}
                       </div>
 
-                      <div className="text-xs text-gray-600 flex gap-2 mt-1">
+                      <div className="text-xs text-black-600 flex gap-2 mt-1">
                         <span>DOB: {formattedDOB}</span>
                         <span>|</span>
                         <span>MRN: {resolvedMRN}</span>
@@ -463,8 +439,11 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
               </div>
             )}
           </div>
-          <div className="w-[60%] p-4 overflow-y-auto bg-gray-50">
+
+          {/* RIGHT: Appointment + Patient Form */}
+          <div className="w-[60%] p-4 overflow-y-auto bg-black-50">
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Appointment Details */}
               <section className="bg-white border rounded-xl p-4">
                 <h3 className="text-md font-semibold text-blue-700 flex items-center gap-2 mb-3">
                   <Clock size={16} /> Appointment Details
@@ -482,7 +461,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                   />
 
                   <div className="min-w-[180px]">
-                    <ScrollableTimeDropdown
+                    <SeismicTimeDropdown
                       label="Appointment Time *"
                       name="time"
                       value={formData.time}
@@ -503,6 +482,8 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                   />
                 </div>
               </section>
+
+              {/* Patient Info */}
               <section className="bg-white border rounded-xl p-4">
                 <h3 className="text-md font-semibold text-blue-700 flex items-center gap-2 mb-3">
                   <User2 size={16} /> Patient Information
@@ -516,7 +497,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                     error={errors.first_name}
                     touched={touched.first_name}
@@ -529,7 +510,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                   />
 
@@ -540,7 +521,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                     error={errors.last_name}
                     touched={touched.last_name}
@@ -554,7 +535,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                     error={errors.dob}
                     touched={touched.dob}
@@ -568,7 +549,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     options={["Male", "Female", "Other"]}
                     disabled={!!existingPatient}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                   />
 
@@ -579,7 +560,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                   />
 
@@ -591,7 +572,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     onChange={existingPatient ? undefined : handleChange}
                     placeholder="Enter phone number"
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
                   />
 
@@ -602,11 +583,15 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-gray-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
                     }
+                    error={errors.mrn}
+                    touched={touched.mrn}
                   />
                 </div>
               </section>
+
+              {/* Actions */}
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
@@ -643,6 +628,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
     </div>
   );
 };
+
 const Input = ({
   label,
   type = "text",
@@ -659,7 +645,7 @@ const Input = ({
 
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-600 mb-1">
+      <label className="block text-xs font-semibold text-black-600 mb-1">
         {label}
       </label>
 
@@ -672,7 +658,7 @@ const Input = ({
         placeholder={placeholder}
         className={`
           border rounded-md w-full p-2 text-sm 
-          ${isInvalid ? "border-red-500 bg-red-50" : "border-gray-300"}
+          ${isInvalid ? "border-red-500 bg-red-50" : "border-black-300"}
           ${className}
         `}
       />
@@ -683,6 +669,7 @@ const Input = ({
     </div>
   );
 };
+
 const Select = ({
   label,
   name,
@@ -693,7 +680,7 @@ const Select = ({
   className = "",
 }) => (
   <div>
-    <label className="block text-xs font-semibold text-gray-600 mb-1">
+    <label className="block text-xs font-semibold text-black-600 mb-1">
       {label}
     </label>
     <select
@@ -701,7 +688,7 @@ const Select = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={`border border-gray-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
+      className={`border border-black-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
     >
       <option value="">Select</option>
       {options.map((opt) => (
@@ -710,233 +697,5 @@ const Select = ({
     </select>
   </div>
 );
-const ScrollableTimeDropdown = ({
-  label,
-  name,
-  value,
-  onChange,
-  error,
-  touched,
-  appointmentDate,
-  toast,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
-  const [manualValue, setManualValue] = useState("");
-  const listRef = useRef(null);
-
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let h = 8; h <= 18; h++) {
-      for (let m = 0; m < 60; m += 15) {
-        const d = new Date();
-        d.setHours(h, m, 0, 0);
-        slots.push(
-          d.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          })
-        );
-      }
-    }
-    return slots;
-  };
-
-  const times = generateTimeSlots();
-
-  const isSameDay = (a, b) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-
-  const isPastTimeToday = (slot) => {
-    if (!appointmentDate) return false;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const [Y, M, D] = appointmentDate.split("-").map(Number);
-    const selectedDay = new Date(Y, M - 1, D);
-
-    if (!isSameDay(selectedDay, today)) return false;
-
-    const slotDate = new Date(`1970-01-01 ${slot}`);
-    if (isNaN(slotDate.getTime())) return false;
-
-    const now = new Date();
-
-    if (slotDate.getHours() < now.getHours()) return true;
-    if (
-      slotDate.getHours() === now.getHours() &&
-      slotDate.getMinutes() <= now.getMinutes()
-    )
-      return true;
-
-    return false;
-  };
-
-  const isInvalid = touched && !!error;
-
-  // index of first future (enabled) time – used for auto-scroll
-  const firstFutureIndex = times.findIndex((t) => !isPastTimeToday(t));
-
-  useEffect(() => {
-    if (!open || firstFutureIndex === -1 || !listRef.current) return;
-    const el = listRef.current.querySelector(
-      `[data-index="${firstFutureIndex}"]`
-    );
-    if (el) {
-      el.scrollIntoView({ block: "center" });
-    }
-  }, [open, firstFutureIndex]);
-
-  const handleManualAdd = () => {
-    if (!manualValue.trim()) {
-      toast?.({
-        title: "Time required",
-        description: "Enter a valid appointment time.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const parsed = new Date(`1970-01-01 ${manualValue}`);
-    if (isNaN(parsed.getTime())) {
-      toast?.({
-        title: "Invalid time format",
-        description: "Example: 3:45 PM or 19:45",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (appointmentDate) {
-      const [Y, M, D] = appointmentDate.split("-").map(Number);
-      const selectedDay = new Date(Y, M - 1, D);
-      const today = new Date();
-      const todayMidnight = new Date();
-      todayMidnight.setHours(0, 0, 0, 0);
-      selectedDay.setHours(0, 0, 0, 0);
-
-      if (selectedDay.getTime() === todayMidnight.getTime()) {
-        const selectedDateTime = new Date();
-        selectedDateTime.setHours(
-          parsed.getHours(),
-          parsed.getMinutes(),
-          0,
-          0
-        );
-
-        if (selectedDateTime <= today) {
-          toast?.({
-            title: "Invalid time",
-            description: "Appointment date must be in the future.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-    }
-
-    onChange({ target: { name, value: manualValue } });
-    setManualMode(false);
-    setOpen(false);
-  };
-
-  return (
-    <div className="relative">
-      <label className="block text-xs font-semibold text-gray-600 mb-1">
-        {label}
-      </label>
-
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(!open);
-          setManualMode(false);
-        }}
-        className={`flex justify-between items-center w-full border rounded-md px-3 py-2 text-sm bg-white ${
-          isInvalid ? "border-red-500 bg-red-50" : "border-gray-300"
-        }`}
-      >
-        {value || "Select time"}
-        <ChevronDown size={16} />
-      </button>
-
-      {open && (
-        <div
-          ref={listRef}
-          className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto bg-white border rounded-xl shadow-lg"
-        >
-          {/* Manual Entry Mode */}
-          <div
-            onClick={() => setManualMode(true)}
-            className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 border-b text-blue-700 font-semibold"
-          >
-            Enter time manually
-          </div>
-
-          {manualMode && (
-            <div className="px-3 py-2 bg-gray-50 border-b">
-              <input
-                type="text"
-                placeholder="e.g., 07:45 PM"
-                value={manualValue}
-                onChange={(e) => setManualValue(e.target.value)}
-                className="border border-gray-300 rounded-md w-full p-2 text-sm mb-2"
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualMode(false);
-                    setManualValue("");
-                  }}
-                  className="px-3 py-1 text-sm bg-gray-300 rounded-md"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleManualAdd}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Time Slots */}
-          {times.map((time, index) => {
-            const disabled = isPastTimeToday(time);
-
-            return (
-              <div
-                key={time}
-                data-index={index}
-                onClick={() => {
-                  if (!disabled) {
-                    onChange({ target: { name, value: time } });
-                    setOpen(false);
-                  }
-                }}
-                className={`px-3 py-2 text-sm ${
-                  disabled
-                    ? "text-gray-400 bg-gray-100 cursor-not-allowed"
-                    : "cursor-pointer hover:bg-blue-50"
-                }`}
-              >
-                {time}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default CreateAppointmentModal
