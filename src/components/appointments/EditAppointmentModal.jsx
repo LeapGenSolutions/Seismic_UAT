@@ -13,7 +13,6 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
   const [clickedInside, setClickedInside] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
 
-  // ✅ Inline error state
   const [errors, setErrors] = useState({
     appointment_date: "",
     time: "",
@@ -373,4 +372,4 @@ const Input = ({
   );
 };
 
-export default EditAppointmentModal;
+export default EditAppointmentModal
