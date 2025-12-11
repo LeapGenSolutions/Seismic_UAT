@@ -72,15 +72,35 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
 
   const norm = (str) => (str || "").toString().toLowerCase().trim();
 
-  // LIVE SEARCH INPUT HANDLER
+  const resetPatientAndForm = () => {
+    setExistingPatient(null);
+    setFormData({
+      first_name: "",
+      middle_name: "",
+      last_name: "",
+      dob: "",
+      gender: "",
+      email: "",
+      phone: "",
+      ehr: "",
+      mrn: "",
+      appointment_date: "",
+      time: "",
+      specialization: resolvedSpecialization || "",
+    });
+    setErrors({});
+    setTouched({});
+    setNameSearchTerm("");
+    setNameMatches([]);
+  };
+
   const handleNameInputChange = (e) => {
     const value = e.target.value;
     setNameSearchTerm(value);
 
     const term = norm(value);
-
     if (!term) {
-      setNameMatches([]);
+      resetPatientAndForm();
       return;
     }
 
@@ -91,11 +111,9 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
       );
       const first = norm(d.first_name);
       const last = norm(d.last_name);
-
       return full.includes(term) || first.includes(term) || last.includes(term);
     });
 
-    // Silent when no results
     if (!matches.length) {
       setNameMatches([]);
       return;
@@ -176,7 +194,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Mark required fields as touched
     setTouched((prev) => {
       const next = { ...prev };
       requiredFields.forEach((f) => (next[f] = true));
@@ -192,7 +209,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
       return;
     }
 
-    // Date validation (past dates not allowed)
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -214,12 +230,8 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         }));
         return;
       }
-      // ✅ For today: we allow ANY time (past or future) — no time-based block here
-    } catch {
-      // If date parsing fails, it will already be caught by required field validation
-    }
+    } catch {}
 
-    // MRN uniqueness check for new patients
     if (!existingPatient && formData.mrn?.trim()) {
       const enteredMRN = formData.mrn.trim().toLowerCase();
 
@@ -256,7 +268,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         patient_id = existingPatient.patient_id || d.patient_id;
         practice_id = existingPatient.practice_id || d.practice_id;
       } else {
-        // Create new patient
         const res = await fetch(`${BACKEND_URL}api/patients/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -352,7 +363,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         }
       }}
     >
-      {/* POPUP */}
       <div
         className="
           bg-white shadow-xl rounded-xl 
@@ -364,7 +374,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         "
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
         <div className="flex justify-between items-center px-5 py-3 bg-blue-600 rounded-t-xl">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <Calendar size={18} /> Schedule Appointment
@@ -375,22 +384,33 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         </div>
 
         <div className="flex h-full">
-          {/* LEFT: Existing Patient Search */}
           <div className="w-[40%] border-r border-black-200 p-4 overflow-y-auto">
             <h3 className="text-md font-semibold text-blue-700 mb-3">
               Find Existing Patient
             </h3>
+
             <div className="mb-3">
+            <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold text-black-600 mb-1">
                 Search by Patient Name
               </label>
-              <input
-                value={nameSearchTerm}
-                onChange={handleNameInputChange}
-                placeholder="Start typing name..."
-                className="border rounded-md w-full p-2 text-sm border-black-300"
-              />
+              <button
+                type="button"
+                onClick={resetPatientAndForm}
+                className="text-xs text-blue-700 hover:text-blue-900 underline underline-offset-2"
+              >
+                Reset
+              </button>
             </div>
+
+            <input
+              value={nameSearchTerm}
+              onChange={handleNameInputChange}
+              placeholder="Start typing name..."
+              className="border rounded-md w-full p-2 text-sm border-black-300"
+            />
+          </div>
+
             {nameMatches.length > 0 && (
               <div className="border rounded-md max-h-80 overflow-y-auto">
                 {nameMatches.map((p) => {
@@ -405,7 +425,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                   if (d?.dob) {
                     const cleanDOB = d.dob.split("T")[0];
                     const parts = cleanDOB.split("-");
-
                     if (parts.length === 3) {
                       const [yyyy, mm, dd] = parts;
                       formattedDOB = `${mm}/${dd}/${yyyy}`;
@@ -440,10 +459,8 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
             )}
           </div>
 
-          {/* RIGHT: Appointment + Patient Form */}
           <div className="w-[60%] p-4 overflow-y-auto bg-black-50">
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Appointment Details */}
               <section className="bg-white border rounded-xl p-4">
                 <h3 className="text-md font-semibold text-blue-700 flex items-center gap-2 mb-3">
                   <Clock size={16} /> Appointment Details
@@ -483,7 +500,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                 </div>
               </section>
 
-              {/* Patient Info */}
               <section className="bg-white border rounded-xl p-4">
                 <h3 className="text-md font-semibold text-blue-700 flex items-center gap-2 mb-3">
                   <User2 size={16} /> Patient Information
@@ -497,7 +513,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                     error={errors.first_name}
                     touched={touched.first_name}
@@ -510,7 +526,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                   />
 
@@ -521,7 +537,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                     error={errors.last_name}
                     touched={touched.last_name}
@@ -535,7 +551,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                     error={errors.dob}
                     touched={touched.dob}
@@ -549,7 +565,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     options={["Male", "Female", "Other"]}
                     disabled={!!existingPatient}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                   />
 
@@ -560,7 +576,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                   />
 
@@ -572,7 +588,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     onChange={existingPatient ? undefined : handleChange}
                     placeholder="Enter phone number"
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                   />
 
@@ -583,7 +599,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
                     className={
-                      existingPatient ? "bg-black-100 cursor-not-allowed" : ""
+                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
                     }
                     error={errors.mrn}
                     touched={touched.mrn}
@@ -591,7 +607,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                 </div>
               </section>
 
-              {/* Actions */}
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
@@ -688,7 +703,7 @@ const Select = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={`border border-black-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
+      className={`border border-blue-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
     >
       <option value="">Select</option>
       {options.map((opt) => (
