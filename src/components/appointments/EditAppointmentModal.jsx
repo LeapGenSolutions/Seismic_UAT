@@ -1,10 +1,72 @@
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
 import { useToast } from "../../hooks/use-toast";
 import { updateAppointment } from "../../api/appointment";
 import { Calendar, Clock, User2 } from "lucide-react";
 
+const normalizeStatus = (status) => {
+  const value = (status || "").toString().trim().toLowerCase();
+  return value === "canceled" ? "cancelled" : value;
+};
+
+const isSeismifiedValue = (value) => {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "yes" || normalized === "1";
+  }
+  if (typeof value === "number") return value === 1;
+  return false;
+};
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const toISODate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseISODate = (value) => {
+  if (!DATE_REGEX.test(value || "")) return null;
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const getAppointmentDateTime = (appointment) => {
+  const rawDate =
+    appointment?.appointment_date || appointment?.date || appointment?.appointmentDate;
+  const rawTime = appointment?.time || "";
+
+  if (!rawDate || !rawTime) return null;
+
+  const datePart = String(rawDate).split("T")[0];
+  const [year, month, day] = datePart.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const [hRaw, mRaw] = String(rawTime).split(":");
+  const hours = parseInt(hRaw || "0", 10);
+  const minutes = parseInt(mRaw || "0", 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+};
+
 const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
   const { toast } = useToast();
+  const loggedInDoctor = useSelector((state) => state.me.me);
 
   const [formData, setFormData] = useState({
     ...appointment,
@@ -18,10 +80,33 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
     appointment_date: "",
     time: "",
   });
+  const todayISO = toISODate(new Date());
+
+  const normalizeDateValue = (value) => {
+    const match = String(value || "").match(/^(\d+)-(\d{2})-(\d{2})$/);
+    if (!match) return value;
+
+    const [, year, month, day] = match;
+    if (year.length <= 4) return value;
+    return `${year.slice(0, 4)}-${month}-${day}`;
+  };
+
+  const getAppointmentDateError = (value) => {
+    if (!value || String(value).trim() === "") {
+      return "Appointment date is required.";
+    }
+
+    const parsedDate = parseISODate(value);
+    if (!parsedDate) return "Invalid appointment date";
+    if (value < todayISO) return "Appointment date must be today or later.";
+    return "";
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const nextValue =
+      name === "appointment_date" ? normalizeDateValue(value) : value;
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
 
     // clear inline error when user edits field
     if (errors[name]) {
@@ -29,8 +114,39 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
     }
   };
 
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    if (name !== "appointment_date") return;
+
+    const dateError = getAppointmentDateError(value);
+    setErrors((prev) => ({ ...prev, appointment_date: dateError }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const appointmentDateTime = getAppointmentDateTime(appointment);
+    const hasHappened =
+      appointmentDateTime instanceof Date &&
+      !Number.isNaN(appointmentDateTime.getTime()) &&
+      appointmentDateTime <= new Date();
+    const status = normalizeStatus(appointment?.status);
+    const blocked =
+      hasHappened ||
+      isSeismifiedValue(appointment?.seismified) ||
+      status === "completed" ||
+      status === "cancelled";
+
+    if (blocked) {
+      toast({
+        title: "Cannot update appointment",
+        description:
+          "This appointment has already happened, is completed/cancelled, or is seismified and cannot be rescheduled.",
+        variant: "destructive",
+      });
+      onClose();
+      return;
+    }
 
     const newErrors = {
       appointment_date: "",
@@ -41,24 +157,15 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
     const now = new Date(); // current moment
     today.setHours(0, 0, 0, 0);
 
-    let selectedDate = null;
-    if (formData.appointment_date) {
-      // normalize yyyy-mm-dd to local date
-      const [year, month, day] = formData.appointment_date.split("-").map(Number);
-      if (year && month && day) {
-        selectedDate = new Date(year, month - 1, day);
-        selectedDate.setHours(0, 0, 0, 0);
-      }
-    }
-
-    // 🛑 Missing or invalid date
-    if (!selectedDate || isNaN(selectedDate.getTime())) {
-      newErrors.appointment_date = "Appointment date is required.";
+    const dateError = getAppointmentDateError(formData.appointment_date);
+    if (dateError) {
+      newErrors.appointment_date = dateError;
     } else {
+      const selectedDate = parseISODate(formData.appointment_date);
+      selectedDate.setHours(0, 0, 0, 0);
+
       // 🛑 Past calendar day
-      if (selectedDate < today) {
-        newErrors.appointment_date = "Appointment date must be in the future.";
-      } else if (selectedDate.getTime() === today.getTime()) {
+      if (selectedDate.getTime() === today.getTime()) {
         // Today -> check time
         if (!formData.time) {
           newErrors.time = "Appointment time must be in the future.";
@@ -110,14 +217,13 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
       specialization: formData.specialization,
       id: appointment.id,
       doctor_email: appointment.doctor_email,
+      clinicName: (appointment.clinicName || loggedInDoctor?.clinicName || "").replace(/\s+/g, " ").trim(),
     };
 
-    // Normalize date to yyyy-mm-dd
-    cleanPayload.appointment_date = new Date(
-      cleanPayload.appointment_date
-    )
-      .toISOString()
-      .slice(0, 10);
+    // Keep local calendar date as yyyy-mm-dd without UTC shifting.
+    cleanPayload.appointment_date = String(
+      cleanPayload.appointment_date || ""
+    ).split("T")[0];
 
     try {
       const apiResult = await updateAppointment(
@@ -201,6 +307,8 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
                 name="appointment_date"
                 value={formData.appointment_date}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                min={todayISO}
                 error={errors.appointment_date}
               />
               <Input
@@ -309,7 +417,7 @@ const EditAppointmentModal = ({ appointment, onClose, onUpdated }) => {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-80 text-center">
             <p className="text-gray-800 text-sm mb-4">
-               You have some unsaved details. Do you want to leave without saving?
+              You have some unsaved details. Do you want to leave without saving?
             </p>
 
             <div className="flex justify-between mt-4">
@@ -343,9 +451,11 @@ const Input = ({
   name,
   value,
   onChange,
+  onBlur,
   readOnly,
   className = "",
   error,
+  ...rest
 }) => {
   const hasError = !!error;
 
@@ -360,6 +470,8 @@ const Input = ({
         value={value}
         readOnly={readOnly}
         onChange={onChange}
+        onBlur={onBlur}
+        {...rest}
         className={`
           border rounded-md w-full p-2 text-sm 
           ${hasError ? "border-red-500 bg-red-50" : "border-gray-300"} 

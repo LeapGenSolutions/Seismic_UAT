@@ -17,6 +17,20 @@ const dateOnly = (iso) => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
+const cleanName = (name) => {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length > 1 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    const firstHalf = parts.slice(0, half).join(' ');
+    const secondHalf = parts.slice(half).join(' ');
+    if (firstHalf.toLowerCase() === secondHalf.toLowerCase()) {
+      return firstHalf; // Return the non-duplicated part (e.g., "John Doe" from "John Doe John Doe")
+    }
+  }
+  return name;
+};
+
 const CallHistoryCard = ({ entry }) => (
   <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-6 py-4 flex items-center gap-6">
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 text-sm text-gray-900 flex-1">
@@ -27,7 +41,7 @@ const CallHistoryCard = ({ entry }) => (
 
       <div>
         <span className="font-semibold">Dr Name:</span>
-        <span className="ml-2">{entry.fullName}</span>
+        <span className="ml-2">{cleanName(entry.fullName)}</span>
       </div>
 
       <div>
@@ -59,12 +73,12 @@ const CallHistoryCard = ({ entry }) => (
     <button
       onClick={() =>
         navigate(`/post-call/${entry.appointmentID}?username=${entry.userID}`, {
-      state: {
-        startTime: entry.startTime,
-        endTime: entry.endTime
+          state: {
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+          },
+        })
       }
-    })
-  }
       title="View Post-Call Documentation"
       className="text-blue-600 hover:text-blue-800 ml-auto"
     >
@@ -88,16 +102,22 @@ function CallHistory() {
     (state) => state.me.me.email?.toLowerCase()
   );
 
+  const clinicName = useSelector(
+    (state) => state.me.me.clinicName
+  );
+
   const dropdownRef = useRef(null);
+
   useEffect(() => {
-    if (doctors.length === 0) dispatch(fetchDoctors());
-  }, [doctors.length, dispatch]);
+    if (doctors.length === 0) dispatch(fetchDoctors(clinicName));
+  }, [doctors.length, dispatch, clinicName]);
 
   useEffect(() => {
     if (doctorEmail && selectedDoctors.length === 0) {
       setSelectedDoctors([doctorEmail]);
     }
   }, [doctorEmail, selectedDoctors.length]);
+
   const { data: callHistoryData = [], isLoading } = useQuery({
     queryKey: ["call-history", selectedDoctors],
     queryFn: () => fetchCallHistory(selectedDoctors),
@@ -116,13 +136,12 @@ function CallHistory() {
 
   useEffect(() => {
     let data = [...callHistoryData];
-
     const searchValue = norm(patientSearch);
 
     data = data.filter((item) => {
-      const providerMatch = selectedDoctors.includes(
-        item.userID?.toLowerCase()
-      );
+      // Use norm(item.userID) to be consistent with robust string handling.
+      // selectedDoctors generally contains lowercased emails.
+      const providerMatch = selectedDoctors.includes(norm(item.userID));
 
       const d = dateOnly(item.startTime);
       const dateMatch =
@@ -132,22 +151,36 @@ function CallHistory() {
       const patientMatch =
         !searchValue || norm(item.patientName).includes(searchValue);
 
-      return providerMatch && dateMatch && patientMatch;
+      // Use strict normalization (remove all whitespace) for reliable matching
+      const userClinic = norm(clinicName);
+      const entryClinic = norm(
+        item.clinicName ||
+        item.details?.clinicName ||
+        item.original_json?.clinicName ||
+        item.clinic_name ||
+        item.details?.clinic_name ||
+        item.practiceName
+      );
+
+      // If user has a clinic, only show entries that match that clinic or have no clinic data (legacy/missing)
+      const clinicMatch = !userClinic || !entryClinic || entryClinic === userClinic;
+
+      return providerMatch && dateMatch && patientMatch && clinicMatch;
     });
 
     data.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-
     setFilteredData(data);
-  }, [callHistoryData, selectedDoctors, startDate, endDate, patientSearch]);
+  }, [callHistoryData, selectedDoctors, startDate, endDate, patientSearch, clinicName]);
 
   const resetFilters = () => {
-  setStartDate(null);
-  setEndDate(null);
-  setPatientSearch("");
-  if (doctorEmail) {
-    setSelectedDoctors([doctorEmail.toLowerCase()]);
-  }
-};
+    setStartDate(null);
+    setEndDate(null);
+    setPatientSearch("");
+    if (doctorEmail) {
+      setSelectedDoctors([doctorEmail.toLowerCase()]);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Title */}
@@ -162,7 +195,6 @@ function CallHistory() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-4">
-
         <div ref={dropdownRef}>
           <DoctorMultiSelect
             selectedDoctors={selectedDoctors}
@@ -174,6 +206,7 @@ function CallHistory() {
           />
         </div>
 
+        {/* Date range – future dates disabled */}
         <DatePicker
           selectsRange
           startDate={startDate}
@@ -185,6 +218,7 @@ function CallHistory() {
           placeholderText="Select date range"
           className="h-10 border border-gray-300 rounded-md px-4 text-sm w-64"
           isClearable
+          maxDate={new Date()}
         />
 
         <input
@@ -218,6 +252,8 @@ function CallHistory() {
           </div>
         )}
       </div>
+
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { FaUserMd, FaVideo} from "react-icons/fa";
-import { format, parseISO } from "date-fns";
+import { FaUserMd, FaVideo } from "react-icons/fa";
+import { format } from "date-fns";
 import { fetchAppointmentDetails } from "../../redux/appointment-actions";
 
 const AppointmentStats = ({ date: propDate }) => {
@@ -25,24 +25,32 @@ const AppointmentStats = ({ date: propDate }) => {
     loggedInDoctor?.oid ||
     null;
 
-  // Always fetch appointments for the logged-in doctor when dashboard loads
+  // Always normalize "today" to a yyyy-MM-dd STRING (local calendar day)
+  const localTodayKey = new Date().toLocaleDateString("en-CA");
+  const utcTodayKey = new Date().toISOString().slice(0, 10);
+
   useEffect(() => {
     if (DoctorEmail) {
-      dispatch(fetchAppointmentDetails(DoctorEmail));
+      dispatch(fetchAppointmentDetails(DoctorEmail, loggedInDoctor?.clinicName));
     }
-  }, [dispatch, DoctorEmail]);
+  }, [dispatch, DoctorEmail, loggedInDoctor?.clinicName]);
 
-  // Get today's date in local timezone (yyyy-MM-dd)
-  const today = propDate || new Date().toLocaleDateString("en-CA");
+  // Always normalize "today" to a yyyy-MM-dd STRING (local calendar day)
+  const todayKey =
+    typeof propDate === "string"
+      ? propDate === utcTodayKey && localTodayKey !== utcTodayKey
+        ? localTodayKey
+        : propDate
+      : propDate instanceof Date
+        ? format(propDate, "yyyy-MM-dd")
+        : localTodayKey;
 
   // Safely build a local Date from yyyy-MM-dd for display
   let formattedDate = "";
-  if (typeof today === "string") {
-    const [year, month, day] = today.split("-").map(Number);
+  {
+    const [year, month, day] = todayKey.split("-").map(Number);
     const localDate = new Date(year, month - 1, day);
     formattedDate = format(localDate, "MMMM d, yyyy");
-  } else {
-    formattedDate = format(today, "MMMM d, yyyy");
   }
 
   // Compute stats only for the logged-in doctor
@@ -60,17 +68,19 @@ const AppointmentStats = ({ date: propDate }) => {
     }
 
     const todayAppointments = appointments.filter((app) => {
-      // normalize date to yyyy-MM-dd
-      let appDate = app.appointment_date;
-      if (typeof appDate === 'string') {
-        try {
-          appDate = format(parseISO(appDate), 'yyyy-MM-dd');
-        } catch {
-          // leave as original if parse fails
-        }
+      let appDateKey = app.appointment_date;
+
+      // Normalize appointment date to yyyy-MM-dd WITHOUT timezone shifting
+      if (typeof appDateKey === 'string') {
+        // Handles "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ssZ"
+        appDateKey = appDateKey.slice(0, 10);
+      } else if (appDateKey instanceof Date) {
+        appDateKey = format(appDateKey, "yyyy-MM-dd");
+      } else {
+        appDateKey = "";
       }
 
-      const isToday = appDate === today;
+      const isToday = appDateKey === todayKey;
 
       // robust doctor matching (same pattern as other components)
       const isSameDoctor =
@@ -81,7 +91,17 @@ const AppointmentStats = ({ date: propDate }) => {
           (app.doctorEmail === DoctorEmail ||
             app.doctor_email === DoctorEmail));
 
-      return isToday && isSameDoctor && app.status !== "cancelled";
+      const normalize = (s) => (s || "").trim().toLowerCase();
+      const userClinic = normalize(loggedInDoctor?.clinicName);
+      const apptClinic = normalize(
+        app.clinicName ||
+        app.details?.clinicName ||
+        app.original_json?.clinicName ||
+        app.original_json?.details?.clinicName
+      );
+      const matchesClinic = !userClinic || apptClinic === userClinic;
+
+      return isToday && isSameDoctor && matchesClinic && app.status !== "cancelled";
     });
 
     const inPersonAppointments = todayAppointments.filter(
@@ -99,7 +119,7 @@ const AppointmentStats = ({ date: propDate }) => {
       virtualAppointments,
     });
     setIsLoading(false);
-  }, [appointments, today, DoctorEmail, doctorUniqueId]);
+  }, [appointments, todayKey, DoctorEmail, doctorUniqueId, loggedInDoctor?.clinicName]);
 
   if (isLoading) {
     return (
@@ -128,7 +148,7 @@ const AppointmentStats = ({ date: propDate }) => {
           <div className="text-sm text-gray-500">{formattedDate}</div>
         </div>
         <div className="bg-blue-100 p-3 rounded-full">
-          <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="8" fill="#3b82f6" opacity="0.15"/><path d="M8 7h8M8 11h8M8 15h4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/></svg>
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="8" fill="#3b82f6" opacity="0.15" /><path d="M8 7h8M8 11h8M8 15h4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" /></svg>
         </div>
       </div>
       <div className="flex items-center bg-blue-50 rounded-lg p-4 mb-4">
