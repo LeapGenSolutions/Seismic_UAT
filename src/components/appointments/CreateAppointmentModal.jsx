@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { BACKEND_URL } from "../../constants";
 import { createAppointment } from "../../api/appointment";
@@ -8,16 +9,56 @@ import UnsavedChangesModal from "../UnsavedChangesModal";
 import { Calendar, User2, Clock } from "lucide-react";
 import SeismicTimeDropdown from "./SeismicTimeDropdown";
 
-const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
+const extractMRN = (p) =>
+  p.mrn ||
+  p.original_json?.mrn ||
+  p.original_json?.details?.mrn ||
+  p.original_json?.original_json?.details?.mrn ||
+  "";
+
+const extractPatientId = (p) =>
+  p.patient_id ||
+  p.patientID ||
+  p.details?.patient_id ||
+  p.details?.patientID ||
+  p.original_json?.patient_id ||
+  p.original_json?.patientID ||
+  p.original_json?.details?.patient_id ||
+  p.original_json?.details?.patientID ||
+  p.original_json?.original_json?.details?.patient_id ||
+  p.original_json?.original_json?.details?.patientID ||
+  "";
+
+const extractPracticeId = (p) =>
+  p.practice_id ||
+  p.practiceID ||
+  p.details?.practice_id ||
+  p.details?.practiceID ||
+  p.original_json?.details?.practice_id ||
+  p.original_json?.details?.practiceID ||
+  "";
+
+const extractDetails = (p) =>
+  p.details ||
+  p.original_json?.details ||
+  p.original_json?.original_json?.details ||
+  p;
+
+const CreateAppointmentModal = ({ onClose, onSuccess }) => {
   const { toast } = useToast();
   const dispatch = useDispatch();
 
-  useEffect(() => {
-    dispatch(fetchPatientsDetails());
-  }, [dispatch]);
-
   const loggedInDoctor = useSelector((state) => state.me.me);
+
+  useEffect(() => {
+    if (loggedInDoctor?.clinicName) {
+      dispatch(fetchPatientsDetails(loggedInDoctor.clinicName));
+    } else {
+      dispatch(fetchPatientsDetails());
+    }
+  }, [dispatch, loggedInDoctor?.clinicName]);
   const patientsList = useSelector((state) => state.patients.patients);
+
   const [existingPatient, setExistingPatient] = useState(null);
 
   const resolvedDoctorName = loggedInDoctor?.doctor_name;
@@ -57,20 +98,53 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
     "time",
   ];
 
-  const extractMRN = (p) =>
-    p.mrn ||
-    p.original_json?.mrn ||
-    p.original_json?.details?.mrn ||
-    p.original_json?.original_json?.details?.mrn ||
-    "";
+  const norm = (str) => (str || "").toLowerCase().trim();
+  const sanitizeNameInput = (value) =>
+    String(value || "").replace(/[^a-zA-Z\s'-]/g, "");
+  const getFirstName = (d) => d.first_name || d.firstname || "";
+  const getMiddleName = (d) => d.middle_name || d.middlename || "";
+  const getLastName = (d) => d.last_name || d.lastname || "";
+  const getGender = (d) => d.gender || d.sex || "";
+  const getPhone = (d) => d.phone || d.contactmobilephone || "";
+  const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+  const MIN_DOB_AGE_YEARS = 120;
 
-  const extractDetails = (p) =>
-    p.details ||
-    p.original_json?.details ||
-    p.original_json?.original_json?.details ||
-    p;
+  const toISODate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
-  const norm = (str) => (str || "").toString().toLowerCase().trim();
+  const todayISO = toISODate(new Date());
+
+  const parseISODate = (value) => {
+    if (!DATE_REGEX.test(value || "")) return null;
+
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(year, month - 1, day);
+
+    if (
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() !== month - 1 ||
+      parsed.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return parsed;
+  };
+
+  const getAge = (birthDate, referenceDate) => {
+    let age = referenceDate.getFullYear() - birthDate.getFullYear();
+    const hasBirthdayPassedThisYear =
+      referenceDate.getMonth() > birthDate.getMonth() ||
+      (referenceDate.getMonth() === birthDate.getMonth() &&
+        referenceDate.getDate() >= birthDate.getDate());
+
+    if (!hasBirthdayPassedThisYear) age -= 1;
+    return age;
+  };
 
   const resetPatientAndForm = () => {
     setExistingPatient(null);
@@ -94,179 +168,211 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
     setNameMatches([]);
   };
 
+  const resetPatientSearchOnly = () => {
+    setExistingPatient(null);
+    setNameMatches([]);
+  };
+
   const handleNameInputChange = (e) => {
     const value = e.target.value;
     setNameSearchTerm(value);
 
     const term = norm(value);
     if (!term) {
-      resetPatientAndForm();
+      resetPatientSearchOnly();
       return;
     }
 
     const matches = patientsList.filter((p) => {
+      const normalizeClinic = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const userClinic = normalizeClinic(loggedInDoctor?.clinicName);
+      const patientClinic = normalizeClinic(
+        p.clinicName ||
+        p.details?.clinicName ||
+        p.original_json?.clinicName ||
+        p.original_json?.details?.clinicName
+      );
+
+      // Clinic Name check
+      if (userClinic && patientClinic !== userClinic) {
+        return false;
+      }
+
       const d = extractDetails(p);
       const full = norm(
-        [d.first_name, d.middle_name, d.last_name].filter(Boolean).join(" ")
+        [getFirstName(d), getMiddleName(d), getLastName(d)]
+          .filter(Boolean)
+          .join(" ")
       );
-      const first = norm(d.first_name);
-      const last = norm(d.last_name);
-      return full.includes(term) || first.includes(term) || last.includes(term);
+      return full.includes(term);
     });
-
-    if (!matches.length) {
-      setNameMatches([]);
-      return;
-    }
 
     setNameMatches(matches);
   };
 
-  const applyExistingPatient = (match) => {
-    setExistingPatient(match);
-    const d = extractDetails(match);
-    const resolvedMRN = extractMRN(match);
+  const applyExistingPatient = (p) => {
+    setExistingPatient(p);
+    const d = extractDetails(p);
 
     setFormData((prev) => ({
       ...prev,
-      first_name: d.first_name || "",
-      middle_name: d.middle_name || "",
-      last_name: d.last_name || "",
+      first_name: getFirstName(d),
+      middle_name: getMiddleName(d),
+      last_name: getLastName(d),
       dob: d.dob ?? "",
-      gender: d.gender || "",
+      gender: getGender(d),
       email: d.email || "",
-      phone: d.phone || "",
+      phone: getPhone(d),
       ehr: d.ehr || "",
-      mrn: resolvedMRN || d.mrn || prev.mrn || "",
+      mrn: extractMRN(p),
     }));
 
-    setTouched((prev) => ({
-      ...prev,
+    setTouched({
       first_name: true,
       last_name: true,
       dob: true,
-    }));
+    });
 
-    setErrors((prev) => ({
-      ...prev,
-      first_name: "",
-      last_name: "",
-      dob: "",
-    }));
-  };
-
-  const runFieldValidation = (name, value) => {
-    let message = "";
-    if (requiredFields.includes(name) && !value) {
-      message = "This field is required.";
-    }
-    return message;
+    setErrors({});
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    const rawValue = e.target.value;
+    const value =
+      name === "first_name" || name === "middle_name" || name === "last_name"
+        ? sanitizeNameInput(rawValue)
+        : rawValue;
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setTouched((prev) => ({ ...prev, [name]: true }));
+    setFormData((p) => ({ ...p, [name]: value }));
+    setTouched((p) => ({ ...p, [name]: true }));
+    setErrors((prev) => {
+      if (!prev[name]) return prev;
+      const updated = { ...prev };
+      delete updated[name];
+      return updated;
+    });
+  };
 
-    setErrors((prev) => ({
-      ...prev,
-      [name]: runFieldValidation(name, value),
-    }));
+  const handlePhoneChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+
+    setFormData((p) => ({ ...p, phone: digitsOnly }));
+    setTouched((p) => ({ ...p, phone: true }));
+    setErrors((prev) => {
+      if (!prev.phone) return prev;
+      const updated = { ...prev };
+      delete updated.phone;
+      return updated;
+    });
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    requiredFields.forEach((f) => {
-      if (!formData[f]) newErrors[f] = "This field is required.";
+    const errs = {};
+    const newTouched = {};
+
+    requiredFields.forEach((field) => {
+      if (
+        existingPatient &&
+        ["first_name", "last_name", "dob"].includes(field)
+      ) {
+        return;
+      }
+
+      newTouched[field] = true;
+
+      if (!formData[field] || String(formData[field]).trim() === "") {
+        errs[field] = "Required";
+      }
     });
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (!existingPatient) {
+      newTouched.phone = true;
+
+      if (!formData.phone || formData.phone.trim() === "") {
+        errs.phone = "Required";
+      } else if (formData.phone.length !== 10) {
+        errs.phone = "Invalid phone number";
+      }
+    }
+
+    if (formData.appointment_date) {
+      const appointmentDate = parseISODate(formData.appointment_date);
+
+      if (!appointmentDate) {
+        errs.appointment_date = "Invalid appointment date";
+      } else if (formData.appointment_date < todayISO) {
+        errs.appointment_date = "Appointment date cannot be in the past";
+      }
+    }
+
+    if (!existingPatient && formData.dob) {
+      const dob = parseISODate(formData.dob);
+
+      if (!dob) {
+        errs.dob = "Invalid date of birth";
+      } else if (formData.dob > todayISO) {
+        errs.dob = "Date of birth cannot be in the future";
+      } else if (getAge(dob, new Date()) > MIN_DOB_AGE_YEARS) {
+        errs.dob = "Date of birth is out of valid range";
+      }
+    }
+
+    setTouched((prev) => ({ ...prev, ...newTouched }));
+    setErrors(errs);
+
+    return errs;
+  };
+
+  const scrollToFirstError = (errs) => {
+    const firstField = Object.keys(errs)[0];
+    if (!firstField) return;
+
+    const el = document.querySelector(`[name="${firstField}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus();
+    }
   };
 
   const convertTo24Hour = (t) => {
     if (!t) return "";
     const d = new Date(`1970-01-01 ${t}`);
-    if (isNaN(d.getTime())) return "";
+    if (Number.isNaN(d.getTime())) return "";
     return d.toTimeString().slice(0, 5);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    //console.log("DEBUG: CreateAppointmentModal - Submitting with formData:", formData);
+    //console.log("DEBUG: CreateAppointmentModal - LoggedInDoctor:", loggedInDoctor);
 
-    setTouched((prev) => {
-      const next = { ...prev };
-      requiredFields.forEach((f) => (next[f] = true));
-      return next;
-    });
-
-    if (!validateForm()) {
-      toast({
-        title: "Form incomplete",
-        description: "Review highlighted fields before submitting.",
-        variant: "destructive",
-      });
+    const requiredErrors = validateForm();
+    if (Object.keys(requiredErrors).length > 0) {
+      scrollToFirstError(requiredErrors);
       return;
-    }
-
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const [Y, M, D] = formData.appointment_date.split("-").map(Number);
-      const selectedDate = new Date(Y, (M || 1) - 1, D || 1);
-      selectedDate.setHours(0, 0, 0, 0);
-
-      if (selectedDate < today) {
-        toast({
-          title: "Cannot create appointment",
-          description: "Appointment date must be today or in the future.",
-          variant: "destructive",
-        });
-
-        setErrors((prev) => ({
-          ...prev,
-          appointment_date: "Appointment date must be today or in the future.",
-        }));
-        return;
-      }
-    } catch {}
-
-    if (!existingPatient && formData.mrn?.trim()) {
-      const enteredMRN = formData.mrn.trim().toLowerCase();
-
-      const matches = patientsList.filter((p) => {
-        const existing = extractMRN(p);
-        if (!existing) return false;
-        return existing.toString().trim().toLowerCase() === enteredMRN;
-      });
-
-      if (matches.length > 0) {
-        toast({
-          title: "Duplicate MRN",
-          description: "This MRN already exists. Please use a unique MRN.",
-          variant: "destructive",
-        });
-
-        setErrors((prev) => ({
-          ...prev,
-          mrn: "MRN already exists. Please use a unique MRN.",
-        }));
-        setTouched((prev) => ({ ...prev, mrn: true }));
-
-        return;
-      }
     }
 
     setIsSubmitting(true);
 
     try {
-      let patient_id, practice_id;
+      let patient_id;
+      let practice_id;
 
       if (existingPatient) {
-        const d = extractDetails(existingPatient);
-        patient_id = existingPatient.patient_id || d.patient_id;
-        practice_id = existingPatient.practice_id || d.practice_id;
+        patient_id = extractPatientId(existingPatient);
+        practice_id = extractPracticeId(existingPatient);
+
+        if (!patient_id) {
+          toast({
+            title: "Patient selection error",
+            description:
+              "Unable to link selected patient. Please reselect the patient.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
       } else {
         const res = await fetch(`${BACKEND_URL}api/patients/add`, {
           method: "POST",
@@ -281,19 +387,20 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
             phone: formData.phone?.replace(/\D/g, ""),
             ehr: formData.ehr,
             mrn: formData.mrn,
+            clinicName: loggedInDoctor?.clinicName || "", // Added clinicName with fallback
           }),
         });
 
         const saved = await res.json();
-        const d =
-          saved?.chatbotPatient?.original_json?.details ||
-          saved?.chatbotPatient;
-
-        patient_id = saved?.chatbotPatient?.patientID || d?.patient_id;
-        practice_id = saved?.chatbotPatient?.practiceID || d?.practice_id;
+        patient_id =
+          saved?.chatbotPatient?.patientID ||
+          saved?.chatbotPatient?.original_json?.details?.patient_id;
+        practice_id =
+          saved?.chatbotPatient?.practiceID ||
+          saved?.chatbotPatient?.original_json?.details?.practice_id;
       }
 
-      const fullName = [
+      const full_name = [
         formData.first_name,
         formData.middle_name,
         formData.last_name,
@@ -303,10 +410,10 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
 
       const appointmentData = {
         type: "appointment",
+        full_name,
         first_name: formData.first_name,
         middle_name: formData.middle_name,
         last_name: formData.last_name,
-        full_name: fullName,
         dob: formData.dob,
         gender: formData.gender,
         mrn: formData.mrn,
@@ -322,6 +429,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
         phone: formData.phone?.replace(/\D/g, ""),
         patient_id,
         practice_id,
+        clinicName: (loggedInDoctor?.clinicName || "").replace(/\s+/g, " ").trim(), // Added clinicName with fallback
       };
 
       const created = await createAppointment(
@@ -331,17 +439,15 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
 
       toast({
         title: "Appointment created",
-        description: "The appointment has been successfully scheduled.",
-        variant: "success",
+        description: "Appointment scheduled successfully.",
       });
 
-      const savedAppointment = created?.data?.[created.data.length - 1];
-      onSuccess(savedAppointment);
+      onSuccess(created?.data?.at(-1));
       onClose();
     } catch (err) {
       toast({
         title: "Error creating appointment",
-        description: err?.message || "Something went wrong.",
+        description: err?.message || "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -353,9 +459,9 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
     (v) => v !== undefined && v !== null && String(v).trim() !== ""
   );
 
-  return (
+  const modalUI = (
     <div
-      className="fixed inset-0 bg-black/40 flex justify-end items-center z-50"
+      className="fixed inset-0 z-[9999] bg-black/40 flex justify-end items-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           if (formHasAnyValue) setShowUnsavedConfirm(true);
@@ -390,33 +496,33 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
             </h3>
 
             <div className="mb-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-black-600 mb-1">
-                Search by Patient Name
-              </label>
-              <button
-                type="button"
-                onClick={resetPatientAndForm}
-                className="text-xs text-blue-700 hover:text-blue-900 underline underline-offset-2"
-              >
-                Reset
-              </button>
-            </div>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-black-600 mb-1">
+                  Search by Patient Name
+                </label>
+                <button
+                  type="button"
+                  onClick={resetPatientAndForm}
+                  className="text-xs text-blue-700 hover:text-blue-900 underline underline-offset-2"
+                >
+                  Reset
+                </button>
+              </div>
 
-            <input
-              value={nameSearchTerm}
-              onChange={handleNameInputChange}
-              placeholder="Start typing name..."
-              className="border rounded-md w-full p-2 text-sm border-black-300"
-            />
-          </div>
+              <input
+                value={nameSearchTerm}
+                onChange={handleNameInputChange}
+                placeholder="Start typing name..."
+                className="border rounded-md w-full p-2 text-sm border-black-300"
+              />
+            </div>
 
             {nameMatches.length > 0 && (
               <div className="border rounded-md max-h-80 overflow-y-auto">
                 {nameMatches.map((p) => {
                   const d = extractDetails(p);
 
-                  const displayName = [d.first_name, d.middle_name, d.last_name]
+                  const displayName = [getFirstName(d), getMiddleName(d), getLastName(d)]
                     .filter(Boolean)
                     .join(" ");
 
@@ -472,6 +578,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     type="date"
                     name="appointment_date"
                     value={formData.appointment_date}
+                    min={todayISO}
                     onChange={handleChange}
                     error={errors.appointment_date}
                     touched={touched.appointment_date}
@@ -485,7 +592,6 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                       onChange={handleChange}
                       error={errors.time}
                       touched={touched.time}
-                      appointmentDate={formData.appointment_date}
                       toast={toast}
                     />
                   </div>
@@ -512,9 +618,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     value={formData.first_name}
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                     error={errors.first_name}
                     touched={touched.first_name}
                   />
@@ -525,9 +629,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     value={formData.middle_name}
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                   />
 
                   <Input
@@ -536,9 +638,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     value={formData.last_name}
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                     error={errors.last_name}
                     touched={touched.last_name}
                   />
@@ -548,11 +648,17 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     label="Date of Birth *"
                     name="dob"
                     value={formData.dob}
+                    max={todayISO}
                     readOnly={!!existingPatient}
-                    onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
+                    onChange={
+                      existingPatient
+                        ? undefined
+                        : (e) =>
+                          handleChange({
+                            target: { name: "dob", value: e.target.value },
+                          })
                     }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                     error={errors.dob}
                     touched={touched.dob}
                   />
@@ -561,12 +667,10 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     label="Gender"
                     name="gender"
                     value={formData.gender}
-                    onChange={existingPatient ? () => {} : handleChange}
+                    onChange={existingPatient ? () => { } : handleChange}
                     options={["Male", "Female", "Other"]}
                     disabled={!!existingPatient}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                   />
 
                   <Input
@@ -575,9 +679,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     value={formData.email}
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                   />
 
                   <Input
@@ -585,11 +687,12 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     name="phone"
                     value={formData.phone}
                     readOnly={!!existingPatient}
-                    onChange={existingPatient ? undefined : handleChange}
-                    placeholder="Enter phone number"
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    onChange={existingPatient ? undefined : handlePhoneChange}
+                    placeholder="Enter 10-digit phone number"
+                    maxLength={10}
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
+                    error={errors.phone}
+                    touched={touched.phone}
                   />
 
                   <Input
@@ -598,9 +701,7 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
                     value={formData.mrn}
                     readOnly={!!existingPatient}
                     onChange={existingPatient ? undefined : handleChange}
-                    className={
-                      existingPatient ? "bg-blue-50 cursor-not-allowed" : ""
-                    }
+                    className={existingPatient ? "bg-blue-50 cursor-not-allowed" : ""}
                     error={errors.mrn}
                     touched={touched.mrn}
                   />
@@ -642,6 +743,8 @@ const CreateAppointmentModal = ({ username, onClose, onSuccess }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalUI, document.body);
 };
 
 const Input = ({
@@ -655,6 +758,7 @@ const Input = ({
   className = "",
   error,
   touched,
+  ...rest
 }) => {
   const isInvalid = touched && !!error;
 
@@ -671,6 +775,7 @@ const Input = ({
         readOnly={readOnly}
         onChange={onChange}
         placeholder={placeholder}
+        {...rest}
         className={`
           border rounded-md w-full p-2 text-sm 
           ${isInvalid ? "border-red-500 bg-red-50" : "border-black-300"}
@@ -678,9 +783,7 @@ const Input = ({
         `}
       />
 
-      {isInvalid && (
-        <p className="text-red-600 text-xs mt-1">{error}</p>
-      )}
+      {isInvalid && <p className="text-red-600 text-xs mt-1">{error}</p>}
     </div>
   );
 };
@@ -703,7 +806,7 @@ const Select = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={`border border-blue-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
+      className={`border border-black-300 rounded-md w-full p-2 text-sm bg-white ${className}`}
     >
       <option value="">Select</option>
       {options.map((opt) => (

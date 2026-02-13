@@ -5,19 +5,25 @@ import AppointmentStatus from "../components/dashboard/AppointmentStatus";
 import ProviderWorkload from "../components/dashboard/ProviderWorkload";
 import { fetchAppointmentDetails } from "../redux/appointment-actions";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation } from "wouter";
+
+const toISODate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 function Dashboard() {
   const dispatch = useDispatch();
-  const myEmail = useSelector((state) => state.me.me.email);
-  const appointments = useSelector((state) => state.appointments.appointments);
-  const [, navigate] = useLocation();
+  const loggedInDoctor = useSelector((state) => state.me.me);
+  const myEmail = loggedInDoctor?.email;
+  const todayISO = toISODate(new Date());
 
   useEffect(() => {
-    if (appointments?.length === 0 && myEmail) {
-      dispatch(fetchAppointmentDetails(myEmail));
+    if (myEmail) {
+      dispatch(fetchAppointmentDetails(myEmail, loggedInDoctor?.clinicName));
     }
-  }, [dispatch, appointments, myEmail]);
+  }, [dispatch, myEmail, loggedInDoctor?.clinicName]);
 
   useEffect(() => {
     document.title = "Dashboard - Seismic Connect";
@@ -29,11 +35,9 @@ function Dashboard() {
         <WelcomeCard />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AppointmentStats date={new Date().toISOString().split('T')[0]} />
-        <div style={{ cursor: "pointer" }} onClick={() => navigate("/timeline") }>
-          <AppointmentStatus date={new Date().toISOString().split('T')[0]} />
-        </div>
-        <ProviderWorkload date={new Date().toISOString().split('T')[0]} />
+        <AppointmentStats date={todayISO} />
+        <AppointmentStatus date={todayISO} />
+        <ProviderWorkload date={todayISO} />
       </div>
     </div>
   );
