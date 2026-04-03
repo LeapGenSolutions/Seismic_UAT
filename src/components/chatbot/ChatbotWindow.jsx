@@ -1,23 +1,25 @@
 import { useRef, useState, useEffect, useCallback} from "react";
+import { createPortal } from "react-dom";
 import { CHATBOT_URL } from "../../constants";
 import { useLocation } from "wouter";
+import { usePermission } from "../../hooks/use-permission";
 
 
 
 const ChatbotWindow = () => {
+    const canAccessChatbot = usePermission("chatbot.access", "read");
     const [open, setOpen] = useState(false);
     const [minimized, setMinimized] = useState(false);
     const [iframeKey, setIframeKey] = useState(Date.now()); // for reload/close
     const iframeRef = useRef();
     const [location] = useLocation();
     const isMeetingPage = location.startsWith("/meeting-room/");
-    const SIDEBAR_WIDTH = 256;
+    const SIDEBAR_WIDTH = 256; // fallback if sidebar can't be measured
+    const [leftOffset, setLeftOffset] = useState(null);
     const [windowSize, setWindowSize] = useState({ width: 320, height: 400 });
     const [isResizing, setIsResizing] = useState(false);
     const chatbotWindowRef = useRef(null);
-    // store the starting values to avoid jumps when starting resize
     const resizeStartRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
-    // toggle depending on where the handle lives; we placed it in top-left
     const HANDLE_TOP_LEFT = true;
 
     const onPointerDownResize = useCallback((e) => {
@@ -95,6 +97,46 @@ const ChatbotWindow = () => {
         };
     }, [isResizing, onPointerMove, onPointerUp]);
 
+    // compute left offset so the button sits next to the sidebar
+    useEffect(() => {
+        const updateLeft = () => {
+            try {
+                const sidebarEl = document.querySelector('[data-sidebar]');
+                if (sidebarEl) {
+                    const rect = sidebarEl.getBoundingClientRect();
+                    // place 16px gap after sidebar
+                    setLeftOffset(Math.round(rect.right + 16));
+                } else {
+                    setLeftOffset(null);
+                }
+            } catch (e) {
+                setLeftOffset(null);
+            }
+        };
+
+        updateLeft();
+
+        // update on window resize
+        window.addEventListener('resize', updateLeft);
+
+        // observe sidebar size/position changes (e.g. when toggling)
+        let ro;
+        try {
+            const sidebarEl = document.querySelector('[data-sidebar]');
+            if (sidebarEl && window.ResizeObserver) {
+                ro = new ResizeObserver(() => updateLeft());
+                ro.observe(sidebarEl);
+            }
+        } catch (err) {
+            // ignore if ResizeObserver not available
+        }
+
+        return () => {
+            window.removeEventListener('resize', updateLeft);
+            try { if (ro && ro.disconnect) ro.disconnect(); } catch (e) {}
+        };
+    }, [location, isMeetingPage]);
+
     // Open button (always visible)
     const openButton = (
         <button
@@ -106,7 +148,7 @@ const ChatbotWindow = () => {
             style={{
                 position: "fixed",
                 bottom: 24,
-                left: isMeetingPage ? SIDEBAR_WIDTH + 24 : "auto",
+                left: isMeetingPage ? (leftOffset ?? (SIDEBAR_WIDTH + 24)) : "auto",
                 right: isMeetingPage ? "auto" : 24,
                 transition: "left 0.3s ease, right 0.3s ease",
                 zIndex: 101,
@@ -136,7 +178,7 @@ const ChatbotWindow = () => {
             style={{
                 position: "fixed",
                 bottom: 24,
-                left: isMeetingPage ? SIDEBAR_WIDTH + 24 : "auto",
+                left: isMeetingPage ? (leftOffset ?? (SIDEBAR_WIDTH + 24)) : "auto",
                 right: isMeetingPage ? "auto" : 24,
                 zIndex: 100,
                 resize: minimized ? undefined : "both",
@@ -243,11 +285,21 @@ const ChatbotWindow = () => {
         </div>
     );
 
-    return (
+    // Render floating controls into document.body to avoid layout/transform issues
+    if (!canAccessChatbot) {
+        return null;
+    }
+
+    if (typeof document === "undefined") {
+        return null;
+    }
+
+    return createPortal(
         <>
             {openButton}
             {chatbotWindow}
-        </>
+        </>,
+        document.body
     );
 };
 

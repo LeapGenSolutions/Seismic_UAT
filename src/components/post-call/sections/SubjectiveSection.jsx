@@ -1,6 +1,77 @@
 import { Textarea } from "../../ui/textarea";
-import { Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { Copy, Check, Send, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+
+const PostIconButton = ({ onClick, disabled, globalStatus, postResetKey }) => {
+  const [localStatus, setLocalStatus] = useState("idle");
+
+  useEffect(() => {
+    setLocalStatus("idle");
+  }, [postResetKey]);
+
+  let normalizedGlobal = globalStatus;
+  if (normalizedGlobal === true) normalizedGlobal = "success";
+  if (normalizedGlobal === false) normalizedGlobal = "error";
+
+  const handleClick = () => {
+    if (localStatus === "posting" || normalizedGlobal === "posting") return;
+
+    setLocalStatus("posting");
+    onClick(
+      () => {
+        setLocalStatus("success");
+        setTimeout(() => setLocalStatus("idle"), 3000);
+      },
+      () => {
+        setLocalStatus("error");
+        setTimeout(() => setLocalStatus("idle"), 3000);
+      }
+    );
+  };
+
+  let effectiveStatus = localStatus;
+  if (
+    normalizedGlobal === "success" ||
+    normalizedGlobal === "error" ||
+    normalizedGlobal === "posting"
+  ) {
+    effectiveStatus = normalizedGlobal;
+  }
+
+  let bgClass =
+    "bg-white text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400";
+  let icon = <Send className="w-3.5 h-3.5" />;
+  let label = null;
+
+  if (disabled || normalizedGlobal === "posting") {
+    bgClass = "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed";
+  } else if (effectiveStatus === "success") {
+    bgClass =
+      "bg-green-50 text-green-700 border-green-300 w-auto px-2 hover:bg-green-100 hover:border-green-400 cursor-pointer";
+    icon = <CheckCircle2 className="w-3.5 h-3.5 mr-1" />;
+    label = <span className="text-xs font-medium">Success</span>;
+  } else if (effectiveStatus === "error") {
+    bgClass =
+      "bg-red-50 text-red-700 border-red-300 w-auto px-2 hover:bg-red-100 cursor-pointer";
+    icon = <AlertCircle className="w-3.5 h-3.5 mr-1" />;
+    label = <span className="text-xs font-medium">Failed</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled || normalizedGlobal === "posting"}
+      title="Post to Athena"
+      className={`inline-flex items-center justify-center h-7 rounded-md border transition-all ml-2 ${bgClass} ${
+        effectiveStatus === "idle" ? "w-7" : ""
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+};
 
 const CopyIconButton = ({ text, label }) => {
   const [copied, setCopied] = useState(false);
@@ -11,9 +82,7 @@ const CopyIconButton = ({ text, label }) => {
       await navigator.clipboard.writeText(String(text));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // no-op
-    }
+    } catch {}
   };
 
   return (
@@ -29,20 +98,28 @@ const CopyIconButton = ({ text, label }) => {
       } ${copied ? "px-2 gap-1.5" : "w-7"}`}
     >
       {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-      {copied && <span className="text-[10px] font-semibold uppercase tracking-wide">Copied</span>}
+      {copied && (
+        <span className="text-[10px] font-semibold uppercase tracking-wide">
+          Copied
+        </span>
+      )}
     </button>
   );
 };
 
-const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
+const SubjectiveSection = ({
+  soapNotes,
+  setSoapNotes,
+  isEditing,
+  onPost,
+  sectionStatuses = {},
+  postResetKey,
+}) => {
   const subj = soapNotes.subjective || {};
+  const [postedItems, setPostedItems] = useState({});
 
-  const setField = (key, value) => {
-    setSoapNotes({
-      ...soapNotes,
-      subjective: { ...subj, [key]: value },
-    });
-  };
+  const setField = (key, value) =>
+    setSoapNotes({ ...soapNotes, subjective: { ...subj, [key]: value } });
 
   const quote = (cc) => {
     if (!cc) return "";
@@ -65,19 +142,53 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
       });
   };
 
+  const handleSectionPost = (type, content) => (onSuccess, onError) => {
+    const isAlreadyPosted = sectionStatuses[type] === "success" || postedItems[type];
+
+    onPost(
+      {
+        type,
+        content,
+        alreadyPosted: isAlreadyPosted,
+      },
+      () => {
+        setPostedItems((prev) => ({ ...prev, [type]: true }));
+        onSuccess();
+      },
+      onError
+    );
+  };
+
   return (
     <div className="pt-2 text-gray-900 leading-relaxed space-y-2">
       <p className="font-semibold text-blue-700 text-lg">Subjective</p>
-
       {!isEditing ? (
         <>
           {subj.chief_complaint && (
             <>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-base font-bold">Chief Complaint:</p>
-                <CopyIconButton text={subj.chief_complaint} label="Chief Complaint" />
+                <div className="flex items-center">
+                  <CopyIconButton
+                    text={subj.chief_complaint}
+                    label="Chief Complaint"
+                  />
+                  {onPost && (
+                    <PostIconButton
+                      onClick={handleSectionPost(
+                        "Chief Complaint",
+                        subj.chief_complaint
+                      )}
+                      disabled={!subj.chief_complaint}
+                      globalStatus={sectionStatuses["Chief Complaint"] || "idle"}
+                      postResetKey={postResetKey}
+                    />
+                  )}
+                </div>
               </div>
-              <p className="ml-4 text-[15px] leading-relaxed">{quote(subj.chief_complaint)}</p>
+              <p className="ml-4 text-[15px] leading-relaxed">
+                {quote(subj.chief_complaint)}
+              </p>
             </>
           )}
 
@@ -85,7 +196,25 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
             <>
               <div className="flex items-center justify-between gap-3 mt-2">
                 <p className="font-bold text-black">History of Present Illness:</p>
-                <CopyIconButton text={subj.hpi} label="History of Present Illness" />
+                <div className="flex items-center">
+                  <CopyIconButton
+                    text={subj.hpi}
+                    label="History of Present Illness"
+                  />
+                  {onPost && (
+                    <PostIconButton
+                      onClick={handleSectionPost(
+                        "History of Present Illness",
+                        subj.hpi
+                      )}
+                      disabled={!subj.hpi}
+                      globalStatus={
+                        sectionStatuses["History of Present Illness"] || "idle"
+                      }
+                      postResetKey={postResetKey}
+                    />
+                  )}
+                </div>
               </div>
               <p className="ml-4 text-[15px] leading-relaxed">{subj.hpi}</p>
             </>
@@ -95,7 +224,9 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
             <>
               <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="font-bold text-black">Family History Discussed:</p>
-                <CopyIconButton text={subj.family_history} label="Family History" />
+                <div className="flex items-center">
+                  <CopyIconButton text={subj.family_history} label="Family History" />
+                </div>
               </div>
               <p className="ml-4 italic text-[15px]">
                 {subj.family_history || "Not discussed"}
@@ -107,7 +238,12 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
             <>
               <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="font-bold text-black">Surgical History Discussed:</p>
-                <CopyIconButton text={subj.surgical_history} label="Surgical History" />
+                <div className="flex items-center">
+                  <CopyIconButton
+                    text={subj.surgical_history}
+                    label="Surgical History"
+                  />
+                </div>
               </div>
               <p className="ml-4 italic text-[15px]">
                 {subj.surgical_history || "Not discussed"}
@@ -119,7 +255,9 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
             <>
               <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="font-bold text-black">Social History Discussed:</p>
-                <CopyIconButton text={subj.social_history} label="Social History" />
+                <div className="flex items-center">
+                  <CopyIconButton text={subj.social_history} label="Social History" />
+                </div>
               </div>
               <p className="ml-4 italic text-[15px]">
                 {subj.social_history || "Not discussed"}
@@ -131,7 +269,17 @@ const SubjectiveSection = ({ soapNotes, setSoapNotes, isEditing }) => {
             <>
               <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="font-bold text-black">Review of Systems:</p>
-                <CopyIconButton text={subj.ros} label="Review of Systems" />
+                <div className="flex items-center">
+                  <CopyIconButton text={subj.ros} label="Review of Systems" />
+                  {onPost && (
+                    <PostIconButton
+                      onClick={handleSectionPost("Review of Systems", subj.ros)}
+                      disabled={!subj.ros}
+                      globalStatus={sectionStatuses["Review of Systems"] || "idle"}
+                      postResetKey={postResetKey}
+                    />
+                  )}
+                </div>
               </div>
               <div className="space-y-1">{renderROS(subj.ros)}</div>
             </>

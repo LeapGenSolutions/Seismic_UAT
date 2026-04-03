@@ -9,6 +9,7 @@ import DeleteAppointmentModal from "./DeleteAppointmentModal";
 import CancelAppointmentModal from "./CancelAppointmentModal";
 import { Pencil, Trash2, XCircle } from "lucide-react";
 import { formatUsDate } from "../../lib/dateUtils";
+import { usePermission } from "../../hooks/use-permission";
 
 const normalizeStatus = (status) => {
   const value = (status || "").toString().trim().toLowerCase();
@@ -25,6 +26,23 @@ const isSeismifiedValue = (value) => {
   return false;
 };
 
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case "cancelled":
+      return "bg-red-100 text-red-800";
+    case "completed":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+const formatStatusLabel = (status) => {
+  const value = (status || "").toString().trim();
+  if (!value) return "N/A";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
 const AppointmentModal = ({
   selectedAppointment,
   setSelectedAppointment,
@@ -37,6 +55,11 @@ const AppointmentModal = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDOB, setShowDOB] = useState(false);
+  const canModifyAppointments = usePermission("appointments.modify", "write");
+  const canDeleteAppointments = usePermission("appointments.delete", "write");
+  const canJoinCall = usePermission("appointments.join_call", "write");
+  const canViewPatientReports = usePermission("appointments.patient_reports", "read");
+  const canViewPostCall = usePermission("appointments.post_call_doc", "read");
 
   useEffect(() => {
     if (selectedAppointment?.id) {
@@ -100,9 +123,17 @@ const AppointmentModal = ({
   const isNotCompleted = normalizedStatus !== "completed";
 
   const canCancel =
-    isFutureSlot && isNotSeismified && isNotCancelled && isNotCompleted;
+    canModifyAppointments &&
+    isFutureSlot &&
+    isNotSeismified &&
+    isNotCancelled &&
+    isNotCompleted;
   const canEdit =
-    isFutureSlot && isNotSeismified && isNotCancelled && isNotCompleted;
+    canModifyAppointments &&
+    isFutureSlot &&
+    isNotSeismified &&
+    isNotCancelled &&
+    isNotCompleted;
 
 
   const formatTime = () => {
@@ -173,7 +204,7 @@ const AppointmentModal = ({
                 </button>
               )}
 
-              {!selectedAppointment.seismified && (
+              {!selectedAppointment.seismified && canDeleteAppointments && (
                 <button
                   onClick={() => setShowDeleteModal(true)}
                   className="text-red-500 hover:text-red-700 transition"
@@ -189,13 +220,17 @@ const AppointmentModal = ({
 
             <p>
               <span className="font-semibold">Patient:</span>{" "}
-              <Link
-                to={`/patients/${selectedAppointment.patient_id}`}
-                target="_blank"
-                className="text-blue-600 hover:underline hover:text-blue-800 transition-colors"
-              >
-                {selectedAppointment.full_name}
-              </Link>
+              {canViewPatientReports ? (
+                <Link
+                  to={`/patients/${selectedAppointment.patient_id}`}
+                  target="_blank"
+                  className="text-blue-600 hover:underline hover:text-blue-800 transition-colors"
+                >
+                  {selectedAppointment.full_name}
+                </Link>
+              ) : (
+                <span>{selectedAppointment.full_name}</span>
+              )}
             </p>
 
             <p><span className="font-semibold">Time:</span> {formatTime()}</p>
@@ -209,7 +244,16 @@ const AppointmentModal = ({
               )}
             </p>
 
-            <p><span className="font-semibold">Status:</span> {selectedAppointment.status}</p>
+            <p>
+              <span className="font-semibold">Status:</span>{" "}
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(
+                  normalizedStatus
+                )}`}
+              >
+                {formatStatusLabel(normalizedStatus)}
+              </span>
+            </p>
             <p className="flex items-center gap-2">
               <span className="font-semibold">DOB:</span>
               {showDOB ? (
@@ -237,44 +281,53 @@ const AppointmentModal = ({
 
             <p><span className="font-semibold">Doctor:</span> {selectedAppointment.doctor_name}</p>
 
-            <div className="flex space-x-4 mt-2">
-              <label className="flex items-center space-x-1">
-                <input type="radio" checked={!isOnline} onChange={() => setIsOnline(false)} />
-                <span>In-Person</span>
-              </label>
-
-              <label className="flex items-center space-x-1">
-                <input type="radio" checked={isOnline} onChange={() => setIsOnline(true)} />
-                <span>Online</span>
-              </label>
-            </div>
-            {isOnline && (
+            {isNotCancelled && (
               <>
-                <p className="pt-2 font-semibold text-gray-700">Meeting Link:</p>
-                <div className="flex w-full">
-                  <input type="text" value={joinLink} readOnly className="flex-grow border border-gray-300 rounded-l-md px-4 py-2" />
-                  <button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-r-md">
-                    <FaCopy />
-                  </button>
+                <div className="flex space-x-4 mt-2">
+                  <label className="flex items-center space-x-1">
+                    <input type="radio" checked={!isOnline} onChange={() => setIsOnline(false)} />
+                    <span>In-Person</span>
+                  </label>
+
+                  <label className="flex items-center space-x-1">
+                    <input type="radio" checked={isOnline} onChange={() => setIsOnline(true)} />
+                    <span>Online</span>
+                  </label>
                 </div>
+
+                {isOnline && (
+                  <>
+                    <p className="pt-2 font-semibold text-gray-700">Meeting Link:</p>
+                    <div className="flex w-full">
+                      <input type="text" value={joinLink} readOnly className="flex-grow border border-gray-300 rounded-l-md px-4 py-2" />
+                      <button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-r-md">
+                        <FaCopy />
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
 
           <div className="mt-6 text-right space-x-1">
-            <button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded">Join</button>
+            {isNotCancelled && canJoinCall && (
+              <button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded">Join</button>
+            )}
 
-            <button
-              onClick={handlePostCallClick}
-              disabled={!selectedAppointment.seismified}
-              className={`py-2 px-4 rounded font-medium ${
-                selectedAppointment.seismified
-                  ? "bg-zinc-600 hover:bg-zinc-700 text-white"
-                  : "bg-gray-300 text-gray-600 cursor-not-allowed"
-              }`}
-            >
-              Post Call Documentation
-            </button>
+            {canViewPostCall && (
+              <button
+                onClick={handlePostCallClick}
+                disabled={!selectedAppointment.seismified}
+                className={`py-2 px-4 rounded font-medium ${
+                  selectedAppointment.seismified
+                    ? "bg-zinc-600 hover:bg-zinc-700 text-white"
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                }`}
+              >
+                Post Call Documentation
+              </button>
+            )}
 
             <button
               onClick={() => setSelectedAppointment(null)}
