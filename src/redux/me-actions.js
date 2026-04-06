@@ -92,7 +92,7 @@ const setMyDetails = (details) => {
         details.specialty ||
         details.userData?.specialization ||
         details.userData?.specialty,
-      given_name: doctorDoc?.firstName || firstName || details.given_name || fullName,
+      given_name: fullName,
       family_name: doctorDoc?.lastName || lastName || details.family_name,
       name: fullName,
       fullName,
