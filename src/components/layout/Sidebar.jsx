@@ -11,13 +11,33 @@ import {
   Menu,
   ShieldCheck,
 } from "lucide-react";
-import { useMsal } from "@azure/msal-react";
 import Logo from "../../assets/Logo"; // Seismic Connect logo
 import { useAnyPermission, usePermission } from "../../hooks/use-permission";
+import {
+  clearStandaloneSession,
+  setStoredAuthType,
+} from "../../lib/auth-storage";
+
+function clearBrowserStorageByPrefix(storage, prefixes) {
+  if (!storage) {
+    return;
+  }
+
+  const keysToRemove = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key && prefixes.some((prefix) => key.startsWith(prefix))) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => {
+    storage.removeItem(key);
+  });
+}
 
 const Sidebar = () => {
   const [location, navigate] = useLocation();
-  const { instance, accounts } = useMsal();
   const sidebarRef = useRef(null);
   const canViewDashboard = true;
   const canViewAppointments = useAnyPermission([
@@ -68,11 +88,20 @@ const Sidebar = () => {
 
   const toggleSidebar = () => setIsOpen((prev) => !prev);
 
-  const handleLogout = () => {
-    instance.logoutRedirect({
-      account: accounts[0],
-      postLogoutRedirectUri: "/",
-    });
+  const handleLogout = async () => {
+    try {
+      clearStandaloneSession();
+      setStoredAuthType(null);
+
+      if (typeof window !== "undefined") {
+        clearBrowserStorageByPrefix(window.localStorage, ["msal.", "msal"]);
+        clearBrowserStorageByPrefix(window.sessionStorage, ["msal.", "msal"]);
+      }
+    } catch (error) {
+      console.error("Logout cleanup failed:", error);
+    }
+
+    window.location.assign("/");
 
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setIsOpen(false);

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { ChevronDown } from "lucide-react";
 import { getColorFromName } from "../constants/colors";
 import { fetchDoctors } from "../redux/doctors-actions";
+import { AUTH_TYPE_CIAM, getStoredAuthType, getStoredBackendToken } from "../lib/auth-storage";
 
 export const doctorColorMap = {};
 
@@ -45,8 +46,8 @@ const DoctorMultiSelect = ({
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const storedToken = sessionStorage.getItem("bypassToken");
-        const isCIAMUser = !!storedToken;
+        const isCIAMUser =
+          getStoredAuthType() === AUTH_TYPE_CIAM || Boolean(getStoredBackendToken());
         const matchesLoggedInUser = (doc) => {
           if (!email) return false;
           const docEmail = doc.doctor_email?.toLowerCase() || "";

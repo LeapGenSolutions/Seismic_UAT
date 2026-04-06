@@ -1,4 +1,5 @@
 import { BACKEND_URL } from "../constants";
+import { getStoredBackendToken } from "../lib/auth-storage";
 
 const BASE = (BACKEND_URL || "").replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
@@ -22,7 +23,7 @@ function buildHeaders(headers = {}) {
   const nextHeaders = { ...headers };
   const backendToken =
     typeof window !== "undefined"
-      ? sessionStorage.getItem("backendToken")
+      ? getStoredBackendToken()
       : null;
 
   if (backendToken) {

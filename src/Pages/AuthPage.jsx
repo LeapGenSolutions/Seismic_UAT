@@ -1,43 +1,68 @@
 import { useMsal } from "@azure/msal-react";
 import { useEffect, useState } from "react";
-import { navigate } from "wouter/use-browser-location";
 import { loginRequest } from "../authConfig";
 import Logo from "../assets/Logo";
-
+import {
+  CIAM_AUTH_URL,
+  CIAM_CLIENT_ID,
+  CIAM_REDIRECT_URI,
+} from "../constants";
+import {
+  AUTH_TYPE_CIAM,
+  AUTH_TYPE_MSAL,
+  clearStandaloneSession,
+  setStoredAuthType,
+} from "../lib/auth-storage";
 
 const AuthPage = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  //const [isGuestLoading, setIsGuestLoading] = useState(false);
+  const [activeLogin, setActiveLogin] = useState(null);
   const [, setShowBranding] = useState(false);
+  const { instance } = useMsal();
 
-  const { instance, accounts } = useMsal();
-
-  useEffect(() => {
-    document.title = "SignUp - Seismic Connect";
-    const timer = setTimeout(() => setShowBranding(true), 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  function requestProfileData() {
-    instance
-      .acquireTokenSilent({
-        ...loginRequest,
-        account: accounts[0],
-      })
-      .then((response) => console.log(response));
-  }
-
-  const handleLogin = () => {
-    setIsLoading(true);
+  const handleMSALLogin = () => {
+    setActiveLogin(AUTH_TYPE_MSAL);
+    clearStandaloneSession();
+    setStoredAuthType(AUTH_TYPE_MSAL);
     instance
       .loginRedirect(loginRequest)
-      .then(() => {
-        requestProfileData();
-        navigate("/");
-      })
-      .catch((e) => console.log(e))
-      .finally(() => setIsLoading(false));
+      .catch((error) => {
+        console.error("MSAL login error:", error);
+        setActiveLogin(null);
+      });
   };
+
+  const handleCIAMLogin = () => {
+    setActiveLogin(AUTH_TYPE_CIAM);
+    setStoredAuthType(AUTH_TYPE_CIAM);
+
+    const invitationToken = new URLSearchParams(window.location.search).get("invitation");
+    const redirectUri = invitationToken
+      ? `${CIAM_REDIRECT_URI}?invitation=${encodeURIComponent(invitationToken)}`
+      : CIAM_REDIRECT_URI;
+    const params = new URLSearchParams({
+      client_id: CIAM_CLIENT_ID,
+      response_type: "id_token",
+      redirect_uri: redirectUri,
+      scope: "openid profile email",
+      nonce: Math.random().toString(36).slice(2),
+      prompt: "login",
+    });
+
+    window.location.assign(`${CIAM_AUTH_URL}?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    document.title = "Login - Seismic Connect";
+    const timer = setTimeout(() => setShowBranding(true), 800);
+    const authMode = new URLSearchParams(window.location.search).get("auth");
+
+    if (authMode === AUTH_TYPE_MSAL) {
+      handleMSALLogin();
+    }
+
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
  // const handleGuest = () => {
  //   setIsGuestLoading(true);
@@ -73,11 +98,11 @@ const AuthPage = () => {
        
         {/* Sign In Button */}
         <button
-          onClick={handleLogin}
-          disabled={isLoading}
+          onClick={handleCIAMLogin}
+          disabled={activeLogin !== null}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#1E40AF] to-[#3B82F6] hover:from-[#1E3A8A] hover:to-[#2563EB] text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] mb-4"
         >
-          {isLoading ? "Signing in..." : "Sign in"}
+          {activeLogin === AUTH_TYPE_CIAM ? "Redirecting..." : "Sign in"}
         </button>
 
         {/* Continue as Guest 
@@ -93,7 +118,9 @@ const AuthPage = () => {
 
         {/* Footer */}
         <div className="mt-6 text-center text-xs text-gray-400">
-          © 2026 Seismic Connect. All rights reserved.
+          <div>
+            © 2026 Seismic Connect. All rights reserved.
+          </div>
         </div>
       </div>
 

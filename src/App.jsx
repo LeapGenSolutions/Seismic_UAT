@@ -38,6 +38,17 @@ import setMyDetails from "./redux/me-actions";
 import { store } from "./redux/store";
 import { normalizeRole } from "./lib/rbac";
 import { BACKEND_URL } from "./constants";
+import {
+  AUTH_TYPE_CIAM,
+  AUTH_TYPE_MSAL,
+  clearLegacyStandaloneBootstrap,
+  clearStandaloneSession,
+  getStoredAuthType,
+  getStoredBackendToken,
+  hasStoredStandaloneSession,
+  setStoredAuthType,
+  setStoredBackendToken,
+} from "./lib/auth-storage";
 
 const queryClient = new QueryClient();
 
@@ -89,11 +100,90 @@ async function verifyStandaloneSession(idToken) {
   }
 
   if (data?.token) {
-    sessionStorage.setItem("backendToken", data.token);
+    setStoredBackendToken(data.token);
   }
 
-  return claims;
+  setStoredAuthType(AUTH_TYPE_CIAM);
+  clearLegacyStandaloneBootstrap();
+
+  return {
+    ...claims,
+    ...data,
+    ...(data?.userData || {}),
+    email: data?.email || claims.email || claims.emails?.[0] || "",
+    userId: data?.userId || claims.sub || claims.oid || "",
+    doctor_id: data?.doctor_id || data?.userId || claims.sub || claims.oid || "",
+    doctor_email: data?.doctor_email || data?.email || claims.email || claims.emails?.[0] || "",
+    profileComplete: data?.profileComplete,
+    approvalStatus: data?.approvalStatus ?? data?.userData?.approvalStatus ?? null,
+    clinicName: data?.clinicName || data?.userData?.clinicName || "",
+    specialty: data?.specialty || data?.userData?.specialty || "",
+    specialization: data?.specialization || data?.userData?.specialty || "",
+    firstName: data?.firstName || data?.userData?.firstName || claims.given_name || "",
+    lastName: data?.lastName || data?.userData?.lastName || claims.family_name || "",
+  };
 }
+
+async function fetchStandaloneProfile(backendToken) {
+  if (!backendToken) {
+    throw new Error("Missing backend token");
+  }
+
+  const response = await fetch(`${BACKEND_URL}api/standalone/profile`, {
+    headers: {
+      Authorization: `Bearer ${backendToken}`,
+    },
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || "Failed to restore standalone session");
+  }
+
+  setStoredAuthType(AUTH_TYPE_CIAM);
+
+  const firstName = data?.firstName || "";
+  const lastName = data?.lastName || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+  return {
+    ...data,
+    email: data?.email || data?.doctor_email || "",
+    userId: data?.userId || data?.doctor_id || "",
+    doctor_id: data?.doctor_id || data?.userId || "",
+    doctor_email: data?.doctor_email || data?.email || "",
+    profileComplete: data?.profileComplete ?? false,
+    approvalStatus: data?.approvalStatus ?? (data?.profileComplete ? "approved" : null),
+    given_name: firstName,
+    family_name: lastName,
+    name: data?.doctor_name || fullName || data?.email || "",
+    fullName: data?.doctor_name || fullName || "",
+    specialty: data?.specialty || data?.specialization || "",
+    specialization: data?.specialization || data?.specialty || "",
+  };
+}
+
+function scrubTokenParamFromUrl() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("token")) {
+    return;
+  }
+
+  url.searchParams.delete("token");
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, document.title, nextUrl || "/");
+}
+
 function Router() {
   const queryParams = new URLSearchParams(window.location.search);
   const role = queryParams.get("role");
@@ -273,8 +363,22 @@ function Router() {
 
 function Main() {
   const isAuthenticated = useIsAuthenticated();
-  const [tokenBypass, setTokenBypass] = useState(false);
-  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [tokenBypass, setTokenBypass] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const queryParams = new URLSearchParams(window.location.search);
+    return Boolean(queryParams.get("token")) || hasStoredStandaloneSession();
+  });
+  const [isAuthorizing, setIsAuthorizing] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const queryParams = new URLSearchParams(window.location.search);
+    return Boolean(queryParams.get("token")) || hasStoredStandaloneSession();
+  });
   const { instance, accounts } = useMsal();
   const dispatch = useDispatch();
   const me = useSelector((state) => state.me.me);
@@ -288,11 +392,8 @@ function Main() {
         account: accounts[0],
       });
 
-      const scopedToken = response.idToken || response.accessToken || "";
-      if (scopedToken) {
-        sessionStorage.setItem("authToken", scopedToken);
-      }
-
+      clearStandaloneSession();
+      setStoredAuthType(AUTH_TYPE_MSAL);
       await dispatch(setMyDetails(response.idTokenClaims));
     } finally {
       setIsAuthorizing(false);
@@ -307,31 +408,47 @@ function Main() {
       try {
         const queryParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = queryParams.get("token");
-        const storedToken = sessionStorage.getItem("bypassToken");
-        const activeToken = tokenFromUrl || storedToken;
+        const storedBackendToken = getStoredBackendToken();
+        const authType = getStoredAuthType();
+        const shouldRestoreStandalone =
+          Boolean(tokenFromUrl) ||
+          authType === AUTH_TYPE_CIAM ||
+          Boolean(storedBackendToken);
 
-        if (activeToken) {
-          if (tokenFromUrl) {
-            sessionStorage.setItem("bypassToken", tokenFromUrl);
-            sessionStorage.setItem("authToken", tokenFromUrl);
-          }
-
+        if (shouldRestoreStandalone) {
           try {
-            const claims = await verifyStandaloneSession(activeToken);
-            await dispatch(setMyDetails(claims));
+            const standaloneDetails = tokenFromUrl
+              ? await verifyStandaloneSession(tokenFromUrl)
+              : await fetchStandaloneProfile(storedBackendToken);
+
+            await dispatch(setMyDetails(standaloneDetails));
+            scrubTokenParamFromUrl();
+
             if (isMounted) {
               setTokenBypass(true);
             }
           } catch (error) {
             console.error("Standalone session verification failed:", error);
-            sessionStorage.removeItem("bypassToken");
-            sessionStorage.removeItem("backendToken");
+            clearStandaloneSession();
+            if (isMounted) {
+              setTokenBypass(false);
+            }
           }
           return;
         }
 
         if (isAuthenticated) {
           await requestProfileData();
+          if (isMounted) {
+            setTokenBypass(false);
+          }
+        } else {
+          if (authType !== AUTH_TYPE_MSAL) {
+            clearStandaloneSession();
+          }
+          if (isMounted) {
+            setTokenBypass(false);
+          }
         }
       } finally {
         if (isMounted) {
@@ -451,7 +568,7 @@ function Main() {
         <AuthenticatedTemplate>{accessDenied}</AuthenticatedTemplate>
       )}
 
-      {!isAuthenticated && !tokenBypass && (
+      {!isAuthenticated && !tokenBypass && !isAuthorizing && (
         <UnauthenticatedTemplate>
           <AuthPage />
         </UnauthenticatedTemplate>
