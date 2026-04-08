@@ -222,7 +222,7 @@ const AppointmentModal = ({
               <span className="font-semibold">Patient:</span>{" "}
               {canViewPatientReports ? (
                 <Link
-                  to={`/patients/${selectedAppointment.patient_id}`}
+                  to={`/patients/${selectedAppointment.athena_patient_id || selectedAppointment.patient_id || selectedAppointment.patientId || selectedAppointment.id}`}
                   target="_blank"
                   className="text-blue-600 hover:underline hover:text-blue-800 transition-colors"
                 >

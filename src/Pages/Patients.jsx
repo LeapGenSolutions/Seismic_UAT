@@ -57,6 +57,32 @@ const getPatientDob = (p) => {
   );
 };
 
+const getPatientInsurance = (patient) => {
+  const athenaInsurance =
+    patient?.insurances?.[0] ||
+    patient?.details?.insurances?.[0] ||
+    patient?.original_json?.details?.insurances?.[0] ||
+    patient?.original_json?.original_json?.details?.insurances?.[0] ||
+    null;
+
+  return {
+    provider:
+      patient?.insurance_provider ||
+      athenaInsurance?.ircname ||
+      athenaInsurance?.insuranceplandisplayname ||
+      athenaInsurance?.insuranceplanname ||
+      athenaInsurance?.insurancepayername ||
+      "Not Available",
+    id:
+      patient?.insurance_id ||
+      athenaInsurance?.insuranceidnumber ||
+      athenaInsurance?.policynumber ||
+      athenaInsurance?.insuranceid ||
+      athenaInsurance?.id ||
+      "",
+  };
+};
+
 const normalizeSearchText = (value) =>
   (value || "").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -227,13 +253,7 @@ function Patients() {
 
       const clinicMatch = !userClinic || !apptClinic || apptClinic === userClinic;
 
-      // If user has a clinic, we show ALL clinic appointments, ignoring specific selected doctors
-      // UNLESS the user explicitly wants to filter within their clinic.
-      // Current requirement: "Entire website filtered based on clinicName" implied we show EVERYTHING for that clinic.
-
-      const doctorMatch = userClinic
-        ? true // If clinic is set, we show all clinic data (primary filter)
-        : (!selectedDoctors.length || selectedDoctors.includes(appt.doctor_email));
+      const doctorMatch = !selectedDoctors.length || selectedDoctors.includes(appt.doctor_email);
 
       const apptDateStr = normalizeDate(getUnifiedApptDate(appt));
 
@@ -468,6 +488,7 @@ function Patients() {
 
                   const rawDob = getPatientDob(p);
                   const formattedDob = formatUsDate(rawDob);
+                  const insurance = getPatientInsurance(p);
 
                   return (
                     <TableRow key={p.patient_id}>
@@ -480,10 +501,10 @@ function Patients() {
                       {/* INSURANCE COLUMN */}
                       <TableCell className="space-y-1">
                         <div className="font-medium">
-                          {p.insurance_provider || "Not Available"}
+                          {insurance.provider}
                         </div>
                         <div className="text-xs text-gray-500">
-                          ID: {maskInsuranceId(p.insurance_id)}
+                          ID: {maskInsuranceId(insurance.id)}
                         </div>
                       </TableCell>
 

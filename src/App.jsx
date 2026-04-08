@@ -32,7 +32,6 @@ import Documentation from "./Pages/Documentation";
 import AuthPage from "./Pages/AuthPage";
 import StreamVideoCoreV3 from "./Pages/StreamVideoCoreV3";
 import TimelineDashboard from "./Pages/TimelineDashboard";
-import ChatbotWindow from "./components/chatbot/ChatbotWindow";
 import { loginRequest } from "./authConfig";
 import setMyDetails from "./redux/me-actions";
 import { store } from "./redux/store";
@@ -354,7 +353,6 @@ function Router() {
             />
             <Route component={NotFound} />
           </Switch>
-          <ChatbotWindow />
         </main>
       </div>
     </div>

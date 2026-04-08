@@ -61,10 +61,13 @@ const PatientInfoComponent = ({
           <strong>Email:</strong> {email}
         </p>
 
-        <p className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-gray-500" />
-          <strong>Insurance Provider:</strong> {insuranceProvider}
-        </p>
+        <div className="flex items-start gap-2 min-w-0">
+          <ShieldCheck className="w-4 h-4 text-gray-500 mt-1 shrink-0" />
+          <div className="min-w-0">
+            <strong>Insurance Provider:</strong>
+            <p className="break-words">{insuranceProvider}</p>
+          </div>
+        </div>
 
         <p className="flex items-center gap-2">
           <IdCard className="w-4 h-4 text-gray-500" />
