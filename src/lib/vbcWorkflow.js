@@ -7,7 +7,18 @@ const normalizeToken = (value = "") =>
 
 const normalizeText = (value = "") => String(value || "").trim();
 
-const BASE = (BACKEND_URL || "").replace(/\/+$/, "");
+const isLocalhost = () => {
+  if (typeof window === "undefined") return false;
+  const host = window.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+};
+
+const BASE = (
+  process.env.REACT_APP_VBC_API_BASE_URL ||
+  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
+  BACKEND_URL ||
+  ""
+).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
 
 const hasValue = (value) =>

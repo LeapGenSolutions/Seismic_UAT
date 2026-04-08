@@ -3,9 +3,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { fetchAppointmentDetails } from "../../redux/appointment-actions";
-import { fetchVbcDetailsConfig, fetchVbcSummary } from "../../api/vbcSummary";
-
-const ALLOWED_FABRIC_HOST = "app.fabric.microsoft.com";
+import { fetchVbcSummary } from "../../api/vbcSummary";
 
 const normalizeToken = (value = "") =>
   String(value).toLowerCase().trim().replace(/[\s_-]/g, "");
@@ -155,24 +153,6 @@ const buildRiskTierDonut = (riskTier) => {
   };
 };
 
-const buildFabricEmbedUrl = (rawUrl) => {
-  try {
-    const parsedUrl = new URL(String(rawUrl || "").trim());
-    const isValidHost =
-      parsedUrl.protocol === "https:" &&
-      parsedUrl.hostname.toLowerCase() === ALLOWED_FABRIC_HOST;
-
-    if (!isValidHost) return "";
-    if (!parsedUrl.searchParams.has("autoAuth")) {
-      parsedUrl.searchParams.set("autoAuth", "true");
-    }
-
-    return parsedUrl.toString();
-  } catch {
-    return "";
-  }
-};
-
 const normalizeText = (value = "") => String(value || "").trim().toLowerCase();
 
 const AppointmentStats = ({ date: propDate }) => {
@@ -196,8 +176,6 @@ const AppointmentStats = ({ date: propDate }) => {
     isLoading: true,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [riskTierVisualUrl, setRiskTierVisualUrl] = useState("");
-  const [isRiskTierVisualLoading, setIsRiskTierVisualLoading] = useState(true);
 
   const doctorEmail = loggedInDoctor?.email || loggedInDoctor?.doctor_email || null;
   const doctorUniqueId =
@@ -272,54 +250,6 @@ const AppointmentStats = ({ date: propDate }) => {
 
     loadVbcMetric();
     return () => controller.abort();
-  }, [todayKey, clinicId, doctorEmail, doctorUniqueId]);
-
-  useEffect(() => {
-    let isActive = true;
-    const controller = new AbortController();
-
-    const loadRiskTierVisual = async () => {
-      setIsRiskTierVisualLoading(true);
-      setRiskTierVisualUrl("");
-
-      try {
-        const detailsConfig = await fetchVbcDetailsConfig(
-          {
-            date: todayKey,
-            metric: "risk-tier",
-            clinicId,
-            doctorEmail,
-            doctorId: doctorUniqueId,
-          },
-          { signal: controller.signal }
-        );
-
-        if (!isActive) return;
-
-        const scopedVisualUrl = String(detailsConfig?.visualEmbedUrl || "").trim();
-        const fallbackVisualUrl = String(detailsConfig?.embedUrl || "").trim();
-        const embedCandidate =
-          scopedVisualUrl ||
-          (/visual(name|id)=/i.test(fallbackVisualUrl) ? fallbackVisualUrl : "");
-
-        setRiskTierVisualUrl(buildFabricEmbedUrl(embedCandidate));
-      } catch (error) {
-        if (error?.name !== "AbortError" && isActive) {
-          setRiskTierVisualUrl("");
-        }
-      } finally {
-        if (isActive) {
-          setIsRiskTierVisualLoading(false);
-        }
-      }
-    };
-
-    loadRiskTierVisual();
-
-    return () => {
-      isActive = false;
-      controller.abort();
-    };
   }, [todayKey, clinicId, doctorEmail, doctorUniqueId]);
 
   let formattedDate = "";
@@ -487,9 +417,6 @@ const AppointmentStats = ({ date: propDate }) => {
             <div className="mt-1 text-[11px] text-slate-500">Last refresh: {refreshTimeLabel}</div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-              {riskTierVisualUrl ? "Live visual" : "Fallback"}
-            </span>
             <Link
               href={buildMetricHref("risk-tier")}
               className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
@@ -506,23 +433,8 @@ const AppointmentStats = ({ date: propDate }) => {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          {vbcMetric.isLoading || isRiskTierVisualLoading ? (
+          {vbcMetric.isLoading ? (
             <div className="h-[230px] w-full animate-pulse rounded bg-slate-200" />
-          ) : riskTierVisualUrl ? (
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <iframe
-                title="Patients by Risk Tier"
-                src={riskTierVisualUrl}
-                className="h-[230px] w-full border-0"
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allow="fullscreen"
-                onError={() => {
-                  setRiskTierVisualUrl("");
-                }}
-                allowFullScreen
-              />
-            </div>
           ) : (
             <Link
               href={buildMetricHref("risk-tier")}
