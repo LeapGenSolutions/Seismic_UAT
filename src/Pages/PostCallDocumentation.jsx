@@ -12,7 +12,6 @@ import Reccomendations from "../components/post-call/Reccomendations";
 import Clusters from "../components/post-call/Clusters";
 import DoctorNotes from "../components/post-call/DoctorNotes";
 import EmotionalConnect from "../components/post-call/EmotionalConnect";
-import VBCGapSummary from "../components/post-call/VBCGapSummary";
 import CallFeedback from "../components/post-call/PostCallFeedback";
 import { fetchCallHistory, fetchDoctorsFromHistory } from "../api/callHistory";
 import { fetchAppointmentDetails } from "../redux/appointment-actions";
@@ -180,20 +179,6 @@ const PostCallDocumentation = ({ onSave }) => {
       null
     : null;
 
-  const patientDisplayName = (
-    selectedAppointment?.full_name ||
-    selectedAppointment?.patient_name ||
-    [firstName, lastName].filter(Boolean).join(" ")
-  ).trim();
-
-  const appointmentDate =
-    selectedAppointment?.appointment_date ??
-    selectedAppointment?.appointmentDate ??
-    selectedAppointment?.date_of_service ??
-    selectedAppointment?.visit_date ??
-    selectedAppointment?.scheduledDate ??
-    "";
-
   const documentationTabs = [
     canViewPostCall && { id: "summary", label: "Summary" },
     canViewPostCall && { id: "transcript", label: "Transcript" },
@@ -203,7 +188,6 @@ const PostCallDocumentation = ({ onSave }) => {
     canViewPostCall && { id: "clusters", label: "Clusters" },
     canViewDoctorNotes && { id: "doctorNotes", label: "Doctor Notes" },
     canViewPostCall && { id: "emotionalConnect", label: "Emotional Connect" },
-    canViewPostCall && { id: "vbcGaps", label: "VBC Gaps" },
   ].filter(Boolean);
 
   useEffect(() => {
@@ -361,13 +345,6 @@ const PostCallDocumentation = ({ onSave }) => {
             />
           )}
 
-          {docTab === "vbcGaps" && (
-            <VBCGapSummary
-              appointmentId={callId}
-              patientName={patientDisplayName}
-              appointmentDate={appointmentDate}
-            />
-          )}
         </CardContent>
       </Card>
     </>

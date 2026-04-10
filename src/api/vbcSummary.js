@@ -1,8 +1,18 @@
 import { BACKEND_URL } from "../constants";
 import { resolveVbcRequestScope, withAuthHeaders } from "./auth";
-import { extractFabricAgentOutput, tryMapFabricSummaryRows } from "../lib/vbcAgentMapper";
 
-const BASE = (BACKEND_URL || "").replace(/\/+$/, "");
+const isLocalhost = () => {
+  if (typeof window === "undefined") return false;
+  const host = window.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+};
+
+const BASE = (
+  process.env.REACT_APP_VBC_API_BASE_URL ||
+  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
+  BACKEND_URL ||
+  ""
+).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
 
 const toNumber = (value, fallback = 0) => {
@@ -22,6 +32,50 @@ const pickFirst = (...values) => values.find(hasValue);
 
 const isObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const isPatientVbcLike = (value) => {
+  if (!isObject(value)) return false;
+  return (
+    Array.isArray(value.gapsInCare) ||
+    Array.isArray(value.gaps_in_care) ||
+    Array.isArray(value.nextBestActions) ||
+    Array.isArray(value.next_best_actions) ||
+    Array.isArray(value.qualityMeasures) ||
+    Array.isArray(value.quality_measures) ||
+    isObject(value.risk)
+  );
+};
+
+const extractPatientVbc = (payload) => {
+  if (isPatientVbcLike(payload)) return payload;
+  if (!isObject(payload)) return null;
+
+  const dataRoot = isObject(payload.data) ? payload.data : payload;
+  const candidates = [
+    dataRoot.patientVbc,
+    dataRoot.patient_vbc,
+    dataRoot.vbcPatient,
+    dataRoot.vbc_patient,
+    dataRoot.vbc,
+    payload.patientVbc,
+    payload.patient_vbc,
+    payload.vbc,
+    payload.fabricOutput,
+    payload.fabric_output,
+    payload.fabricAgentOutput,
+    payload.fabric_agent_output,
+    dataRoot.fabricOutput,
+    dataRoot.fabric_output,
+    dataRoot.fabricAgentOutput,
+    dataRoot.fabric_agent_output,
+  ];
+
+  for (const candidate of candidates) {
+    if (isPatientVbcLike(candidate)) return candidate;
+  }
+
+  return null;
+};
 
 const toTextArray = (...values) => {
   for (const value of values) {
@@ -612,13 +666,10 @@ const normalizeAppointmentSummary = (item = {}, index = 0) => {
 };
 
 const normalizeSummaryPayload = (payload = {}) => {
-  const fabricAppointments = tryMapFabricSummaryRows(payload);
   const appointmentSource = Array.isArray(payload)
     ? payload
     : payload?.appointments ?? payload?.patients ?? payload?.rows ?? payload?.data ?? [];
-  const appointments = Array.isArray(fabricAppointments)
-    ? fabricAppointments
-    : Array.isArray(appointmentSource)
+  const appointments = Array.isArray(appointmentSource)
     ? appointmentSource.map(normalizeAppointmentSummary)
     : [];
 
@@ -853,7 +904,7 @@ export const fetchVbcDetailsConfig = async (
             patientName ??
             "",
           checklist: getChecklistPayload(dataRoot),
-          patientVbc: extractFabricAgentOutput(payload),
+          patientVbc: extractPatientVbc(payload),
         };
       }
     } catch (error) {

@@ -152,7 +152,6 @@ const VBCWorkQueue = () => {
 
   const [summaryData, setSummaryData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [ownerFilter, setOwnerFilter] = useState(accessLevel === "doctor" ? "provider" : "ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchFilter, setSearchFilter] = useState("");
@@ -169,7 +168,6 @@ const VBCWorkQueue = () => {
 
     const load = async () => {
       setIsLoading(true);
-      setError("");
 
       try {
         const data = await fetchVbcSummary({
@@ -183,7 +181,6 @@ const VBCWorkQueue = () => {
         }
       } catch (loadError) {
         if (isMounted) {
-          setError("Unable to load the VBC work queue.");
           setSummaryData(null);
         }
       } finally {
@@ -282,16 +279,6 @@ const VBCWorkQueue = () => {
             </Link>
           }
         />
-
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Changes made here are saved locally in this browser until backend task persistence is added.
-        </div>
-
-        {error && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {error}
-          </div>
-        )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-xl border border-red-200 bg-red-50 p-4">

@@ -6,5 +6,3 @@ export const STREAM_API_KEY = "72499ykcfb3z"
 // export const REDIRECT_URI = "http://localhost:3000/"
 export const REDIRECT_URI = "https://dev.seismicconnect.com/"
 export const CHATBOT_URL = "https://chat-strlit-gva3h7ekahgdctgk.centralus-01.azurewebsites.net";
-export const FABRIC_SCOPE = "https://analysis.windows.net/powerbi/api/user_impersonation"
-export const FABRIC_REPORT_URL = "https://app.fabric.microsoft.com/reportEmbed?reportId=1495be42-0185-458c-8450-8f57730c4b06&autoAuth=true&ctid=b3e3a3db-e3db-4f76-9a7c-5bca46062c8c"
