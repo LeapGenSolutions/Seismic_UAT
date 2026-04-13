@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, Bell, Globe } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useToast } from "../../hooks/use-toast";
 import { BACKEND_URL } from "../../constants";
 import { getSessionAuthToken } from "../../api/auth";
@@ -19,6 +18,23 @@ export default function PreferencesTab({ profileData, setProfileData }) {
     timeZone: profileData?.timeZone || "America/Los_Angeles",
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  const timeZoneOptions = [
+    { value: "America/New_York", label: "Eastern Time (ET)" },
+    { value: "America/Chicago", label: "Central Time (CT)" },
+    { value: "America/Denver", label: "Mountain Time (MT)" },
+    { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+    { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+    { value: "Pacific/Honolulu", label: "Hawaii-Aleutian Time (HAT)" },
+  ];
+
+  useEffect(() => {
+    setFormData({
+      email: profileData?.notifications?.email ?? true,
+      sms: profileData?.notifications?.sms ?? false,
+      timeZone: profileData?.timeZone || "America/Los_Angeles",
+    });
+  }, [profileData]);
 
   const handleToggle = (field, checked) => {
     setFormData((prev) => ({ ...prev, [field]: checked }));
@@ -135,19 +151,18 @@ export default function PreferencesTab({ profileData, setProfileData }) {
         <CardContent>
           <div className="space-y-2 max-w-sm">
             <Label htmlFor="timezone">Time Zone</Label>
-            <Select value={formData.timeZone} onValueChange={handleTimeZoneChange}>
-              <SelectTrigger id="timezone" className="bg-white border-gray-300">
-                <SelectValue placeholder="Select Time Zone" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                <SelectItem value="Pacific/Honolulu">Hawaii-Aleutian Time (HAT)</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              id="timezone"
+              value={formData.timeZone}
+              onChange={(event) => handleTimeZoneChange(event.target.value)}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              {timeZoneOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-gray-500 pt-1">
               Used for your appointments calendar and timestamps.
             </p>

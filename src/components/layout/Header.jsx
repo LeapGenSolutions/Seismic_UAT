@@ -3,6 +3,7 @@ import { Bell, User, Settings, ChevronDown } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Link, useLocation } from "wouter";
 import { normalizeRole } from "../../lib/rbac";
+import { resolveUserNameParts } from "../../lib/userName";
 
 const Header = () => {
   const [location] = useLocation();
@@ -10,6 +11,7 @@ const Header = () => {
   const dropdownRef = useRef(null);
   const user = useSelector((state) => state.me.me);
   const displayRole = normalizeRole(user?.role) || "Staff";
+  const { firstName, fullName } = resolveUserNameParts(user || {});
 
   const isActive = (path) => location === path;
 
@@ -24,8 +26,8 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fullName = [user?.given_name, user?.family_name].filter(Boolean).join(" ") || user?.name || "User";
-  const initials = user?.given_name?.charAt(0)?.toUpperCase() || "U";
+  const displayName = fullName || "User";
+  const initials = firstName?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <header className="bg-white border-b border-neutral-200">
@@ -132,7 +134,7 @@ const Header = () => {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-neutral-900 truncate">{fullName}</p>
+                      <p className="text-sm font-semibold text-neutral-900 truncate">{displayName}</p>
                       <p className="text-xs text-blue-600 font-medium">{displayRole}</p>
                       {user?.email && (
                         <p className="text-xs text-neutral-500 truncate">{user.email}</p>

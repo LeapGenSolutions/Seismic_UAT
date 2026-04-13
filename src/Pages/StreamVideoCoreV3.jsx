@@ -13,6 +13,7 @@ import RightPanel from "../components/video/RightPanel";
 import { STREAM_API_KEY } from "../constants";
 import { NotesTrigger } from "../components/ui/notes-trigger";
 import { FloatingNotepad } from "../components/ui/floating-notepad";
+import { resolveUserNameParts } from "../lib/userName";
 
 const resolveAuthenticatedStreamUserId = (me = {}) =>
   String(
@@ -33,20 +34,10 @@ const toSlug = (value = "") =>
     .replace(/^-+|-+$/g, "");
 
 const buildDoctorName = (me = {}) => {
-  const firstName = String(me.given_name || "").trim();
-  const lastName = String(me.family_name || "").trim();
+  const { firstName, lastName } = resolveUserNameParts(me);
 
   if (!firstName && !lastName) {
     return "";
-  }
-
-  if (
-    firstName &&
-    lastName &&
-    (firstName.toLowerCase() === lastName.toLowerCase() ||
-      firstName.toLowerCase().endsWith(lastName.toLowerCase()))
-  ) {
-    return firstName;
   }
 
   return [firstName, lastName].filter(Boolean).join(" ").trim();

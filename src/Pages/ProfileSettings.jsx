@@ -5,6 +5,7 @@ import ProfileTab from "../components/profile/ProfileTab";
 import PreferencesTab from "../components/profile/PreferencesTab";
 import LegalTab from "../components/profile/LegalTab";
 import { useSelector } from "react-redux";
+import { resolveUserNameParts } from "../lib/userName";
 
 const TAB_OPTIONS = [
   { id: "profile", label: "My Profile" },
@@ -24,11 +25,13 @@ export default function ProfileSettings() {
     if (me && Object.keys(me).length > 0) {
       setLoading(true);
       setTimeout(() => {
+        const { firstName, lastName, fullName } = resolveUserNameParts(me);
+
         setProfileData({
           id: me.doctor_id || me.id || "user-dynamic",
-          firstName: me.given_name || me.name?.split(" ")[0] || "",
+          firstName: firstName || fullName || "",
           middleName: "",
-          lastName: me.family_name || me.name?.split(" ").slice(1).join(" ") || "",
+          lastName: lastName,
           primaryEmail: me.email || "",
           secondaryEmail: me.secondaryEmail || "",
           role: me.role || "Doctor",
