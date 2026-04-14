@@ -234,6 +234,8 @@ const AppointmentStats = ({ date: propDate }) => {
         });
       } catch (error) {
         if (error?.name !== "AbortError") {
+          // eslint-disable-next-line no-console
+          console.warn("VBC summary fetch failed:", error?.status, error?.url, error);
           setVbcMetric({
             highRiskPatients: 0,
             riskTier: {
