@@ -5,9 +5,28 @@ import { fetchPowerBiEmbedConfig, getPowerBiEmbedConfigUrl } from "../../api/pow
 const toText = (value) =>
   value === undefined || value === null ? "" : String(value).trim();
 
+const isObject = (value) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
 const parseExpiryMs = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value >= 1e12) return value; // ms epoch
+    if (value >= 1e9) return value * 1000; // seconds epoch
+    return null;
+  }
+
   const text = toText(value);
   if (!text) return null;
+
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const numeric = Number(text);
+    if (Number.isFinite(numeric)) {
+      if (numeric >= 1e12) return numeric;
+      if (numeric >= 1e9) return numeric * 1000;
+      return null;
+    }
+  }
+
   const ms = Date.parse(text);
   return Number.isFinite(ms) ? ms : null;
 };
@@ -19,12 +38,71 @@ const getRefreshDelayMs = (expiryMs) => {
 
 const getConfigKey = (params) => JSON.stringify(params || {});
 
+const pickEmbedRoot = (raw) => {
+  if (!isObject(raw)) return null;
+  const data = isObject(raw.data) ? raw.data : null;
+
+  const candidates = [
+    raw,
+    data,
+    raw.embedConfig,
+    raw.embed,
+    raw.powerbi,
+    raw.powerBi,
+    raw.config,
+    data?.embedConfig,
+    data?.embed,
+    data?.powerbi,
+    data?.powerBi,
+    data?.config,
+  ].filter(isObject);
+
+  for (const candidate of candidates) {
+    if (
+      candidate.embedUrl ||
+      candidate.embed_url ||
+      candidate.accessToken ||
+      candidate.access_token ||
+      candidate.token ||
+      candidate.reportId ||
+      candidate.report_id
+    ) {
+      return candidate;
+    }
+  }
+
+  return candidates[0] || raw;
+};
+
 const safeEmbedConfig = (cfg) => {
-  if (!cfg || typeof cfg !== "object") return null;
-  const reportId = toText(cfg.reportId || cfg.id);
-  const embedUrl = toText(cfg.embedUrl);
-  const accessToken = toText(cfg.accessToken || cfg.token);
-  const tokenExpiry = toText(cfg.tokenExpiry || cfg.expiration);
+  const root = pickEmbedRoot(cfg);
+  if (!root) return null;
+
+  const reportId = toText(root.reportId || root.report_id || root.id);
+  const embedUrl = toText(
+    root.embedUrl ||
+      root.embed_url ||
+      root.reportEmbedUrl ||
+      root.report_embed_url ||
+      root.reportUrl ||
+      root.report_url
+  );
+  const accessToken = toText(
+    root.accessToken ||
+      root.access_token ||
+      root.token ||
+      root.embedToken ||
+      root.embed_token
+  );
+  const tokenExpiry = toText(
+    root.tokenExpiry ||
+      root.token_expiry ||
+      root.expiration ||
+      root.expirationTime ||
+      root.expiresOn ||
+      root.expires_on ||
+      root.expiry
+  );
   if (!reportId || !embedUrl || !accessToken) return null;
   return { reportId, embedUrl, accessToken, tokenExpiry: tokenExpiry || null };
 };
@@ -99,7 +177,9 @@ export const PowerBIReportEmbed = ({
       })
       .catch((e) => {
         if (controller.signal.aborted) return;
-        setError(e?.message ? String(e.message) : "Failed to load Power BI embed config.");
+        const message = e?.message ? String(e.message) : "Failed to load Power BI embed config.";
+        const url = e?.url ? ` (${String(e.url)})` : "";
+        setError(`${message}${url}`);
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);
@@ -187,7 +267,9 @@ export const PowerBIReportEmbed = ({
         setEmbedConfig(next);
         await reportRef.current?.setAccessToken(next.accessToken);
       } catch (e) {
-        setError(e?.message ? String(e.message) : "Failed to refresh Power BI token.");
+        const message = e?.message ? String(e.message) : "Failed to refresh Power BI token.";
+        const url = e?.url ? ` (${String(e.url)})` : "";
+        setError(`${message}${url}`);
       }
     }, refreshDelayMs);
 

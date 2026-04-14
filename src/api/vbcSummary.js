@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "../constants";
+import { BACKEND_URL, SOS_URL } from "../constants";
 import { resolveVbcRequestScope, withAuthHeaders } from "./auth";
 
 const isLocalhost = () => {
@@ -7,13 +7,24 @@ const isLocalhost = () => {
   return host === "localhost" || host === "127.0.0.1";
 };
 
+const isLoopbackUrl = (value = "") => {
+  const text = String(value || "").trim().toLowerCase();
+  return text.includes("localhost") || text.includes("127.0.0.1");
+};
+
+const envApiBase = String(process.env.REACT_APP_VBC_API_BASE_URL || "").trim();
+const resolvedEnvApiBase =
+  envApiBase && (!isLoopbackUrl(envApiBase) || isLocalhost()) ? envApiBase : "";
+
 const BASE = (
-  process.env.REACT_APP_VBC_API_BASE_URL ||
+  resolvedEnvApiBase ||
   (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
   BACKEND_URL ||
   ""
 ).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
+const apiForBase = (base, path) =>
+  `${String(base || "").trim().replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -805,12 +816,20 @@ export const fetchVbcSummary = async (
   if (requestScope.doctorId) query.set("doctorId", requestScope.doctorId);
   const queryString = query.toString();
 
-  const endpoints = [
-    api(`/api/vbc/summary${queryString ? `?${queryString}` : ""}`),
-    api(`/api/vbc-summary${queryString ? `?${queryString}` : ""}`),
-    api(`/api/vbc/dashboard/summary${queryString ? `?${queryString}` : ""}`),
-    api(`/api/vbc-dashboard/summary${queryString ? `?${queryString}` : ""}`),
+  const summaryPaths = [
+    `/api/vbc/summary${queryString ? `?${queryString}` : ""}`,
+    `/api/vbc-summary${queryString ? `?${queryString}` : ""}`,
+    `/api/vbc/dashboard/summary${queryString ? `?${queryString}` : ""}`,
+    `/api/vbc-dashboard/summary${queryString ? `?${queryString}` : ""}`,
   ];
+
+  const bases = [BASE];
+  const sosBase = String(SOS_URL || "").trim().replace(/\/+$/, "");
+  if (sosBase && !bases.some((base) => String(base || "").replace(/\/+$/, "") === sosBase)) {
+    bases.push(sosBase);
+  }
+
+  const endpoints = bases.flatMap((base) => summaryPaths.map((path) => apiForBase(base, path)));
 
   let lastError = null;
   for (const endpoint of endpoints) {
@@ -820,7 +839,16 @@ export const fetchVbcSummary = async (
         headers: withAuthHeaders(),
       });
       if (!response.ok) {
-        lastError = new Error(`Failed with status ${response.status}`);
+        const contentType = response.headers.get("content-type") || "";
+        const text = await response.text().catch(() => "");
+        const message =
+          contentType.includes("text/html") && text
+            ? text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240)
+            : text;
+        const error = new Error(message || `Failed with status ${response.status}`);
+        error.status = response.status;
+        error.url = endpoint;
+        lastError = error;
         continue;
       }
 
