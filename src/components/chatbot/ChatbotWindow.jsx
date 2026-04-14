@@ -212,7 +212,6 @@ const ChatbotWindow = () => {
                 right: isMeetingPage ? "auto" : 24,
                 zIndex: 100,
                 resize: minimized ? undefined : "both",
-                overflow: "hidden",
                 minWidth: minimized ? 165 : 320,
                 minHeight: minimized ? 48 : 400,
                 maxWidth: 600,
@@ -223,7 +222,10 @@ const ChatbotWindow = () => {
                 border: "1px solid #e5e7eb",
                 width: minimized ? 165 : windowSize.width,
                 height: minimized ? 45 : windowSize.height,
-                transition: "all 0.2s"
+                transition: "all 0.2s",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden"
             }}
         >
             {/* Header with controls */}
@@ -304,11 +306,13 @@ const ChatbotWindow = () => {
                 ref={iframeRef}
                 src={`${CHATBOT_URL}?token=${token}`}
                 title="Chatbot"
-                width="100%"
-                height="100%"
                 style={{
-                    border: "none", display: minimized ? "none" : "block",
-                    minWidth: 336, minHeight: 400, borderRadius: 12
+                    border: "none",
+                    display: minimized ? "none" : "block",
+                    flex: 1,
+                    minHeight: 0,
+                    width: "100%",
+                    borderRadius: 0 // let parent handle rounding
                 }}
                 allow="clipboard-write;"
             />
