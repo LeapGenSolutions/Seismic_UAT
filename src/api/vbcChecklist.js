@@ -1,7 +1,28 @@
-import { BACKEND_URL } from "../constants";
+import { BACKEND_URL, SOS_URL } from "../constants";
 import { withAuthHeaders } from "./auth";
 
-const BASE = (BACKEND_URL || "").replace(/\/+$/, "");
+const isLocalhost = () => {
+  if (typeof window === "undefined") return false;
+  const host = window.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+};
+
+const isLoopbackUrl = (value = "") => {
+  const text = String(value || "").trim().toLowerCase();
+  return text.includes("localhost") || text.includes("127.0.0.1");
+};
+
+const envApiBase = String(process.env.REACT_APP_VBC_API_BASE_URL || "").trim();
+const resolvedEnvApiBase =
+  envApiBase && (!isLoopbackUrl(envApiBase) || isLocalhost()) ? envApiBase : "";
+
+const BASE = (
+  resolvedEnvApiBase ||
+  SOS_URL ||
+  BACKEND_URL ||
+  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
+  ""
+).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
 
 const getChecklistEndpoints = (appointmentId) => {

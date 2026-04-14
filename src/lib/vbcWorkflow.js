@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "../constants";
+import { BACKEND_URL, SOS_URL } from "../constants";
 import { withAuthHeaders } from "../api/auth";
 import { fetchVbcChecklistByAppointment } from "../api/vbcChecklist";
 
@@ -15,8 +15,9 @@ const isLocalhost = () => {
 
 const BASE = (
   process.env.REACT_APP_VBC_API_BASE_URL ||
-  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
+  SOS_URL ||
   BACKEND_URL ||
+  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
   ""
 ).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;

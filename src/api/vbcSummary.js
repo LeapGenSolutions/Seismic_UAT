@@ -18,8 +18,9 @@ const resolvedEnvApiBase =
 
 const BASE = (
   resolvedEnvApiBase ||
-  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
+  SOS_URL ||
   BACKEND_URL ||
+  (isLocalhost() ? "http://127.0.0.1:8080" : "") ||
   ""
 ).replace(/\/+$/, "");
 const api = (path) => `${BASE}/${String(path).replace(/^\/+/, "")}`;
