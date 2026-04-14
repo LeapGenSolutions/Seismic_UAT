@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useDispatch, useSelector } from "react-redux";
 import { format } from "date-fns";
@@ -565,9 +565,6 @@ const VBCSummary = () => {
   const providerEmail = normalizeEmail(
     me.email || me.doctor_email || sessionScope.doctorEmail || ""
   );
-  const viewerDoctorId = String(
-    me.doctor_id || me.id || me.oid || sessionScope.doctorId || ""
-  ).trim();
   const viewerClinicId = extractClinicId(me) || sessionScope.clinicId;
   const viewerClinicLabel =
     extractClinicLabel(me) || sessionScope.clinicName || viewerClinicId || "N/A";
@@ -1150,10 +1147,35 @@ const VBCSummary = () => {
     const query = new URLSearchParams();
     query.set("date", todayKey);
     if (activeClinicId) query.set("clinicId", activeClinicId);
-    if (providerEmail) query.set("doctorEmail", providerEmail);
-    if (viewerDoctorId) query.set("doctorId", viewerDoctorId);
     return `/vbc/details?${query.toString()}`;
-  }, [activeClinicId, providerEmail, todayKey, viewerDoctorId]);
+  }, [activeClinicId, todayKey]);
+
+  const getRowDetailsHref = useCallback(
+    (row = {}) => {
+      const query = new URLSearchParams();
+      query.set("date", row.appointmentDate || todayKey);
+
+      const clinicId = String(row.clinicId || activeClinicId || "").trim();
+      if (clinicId) query.set("clinicId", clinicId);
+
+      const appointmentId = String(row.id || "").trim();
+      if (appointmentId) query.set("appointmentId", appointmentId);
+
+      const patientName = String(row.patientName || "").trim();
+      if (patientName) {
+        query.set("patientName", patientName);
+      }
+
+      const doctorId = String(row.doctorId || "").trim();
+      if (doctorId) query.set("doctorId", doctorId);
+
+      const doctorEmail = normalizeEmail(row.doctorEmail || "");
+      if (doctorEmail) query.set("doctorEmail", doctorEmail);
+
+      return `/vbc/details?${query.toString()}`;
+    },
+    [activeClinicId, todayKey]
+  );
 
   const resetWorklistFilters = () => {
     setWorklistSearch("");
@@ -1613,17 +1635,7 @@ const VBCSummary = () => {
                     </td>
                     <td className="px-4 py-3 text-sm align-top">
                       <Link
-                        href={`${detailsHref}&appointmentId=${encodeURIComponent(
-                          row.id
-                        )}&patientName=${encodeURIComponent(row.patientName || "")}${
-                          row.doctorId
-                            ? `&doctorId=${encodeURIComponent(row.doctorId)}`
-                            : ""
-                        }${
-                          row.doctorEmail
-                            ? `&doctorEmail=${encodeURIComponent(row.doctorEmail)}`
-                            : ""
-                        }`}
+                        href={getRowDetailsHref(row)}
                         className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
                         View Details

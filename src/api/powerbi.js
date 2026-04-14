@@ -1,4 +1,4 @@
-import { BACKEND_URL, SOS_URL } from "../constants";
+import { BACKEND_URL, POWERBI_API_BASE_URL, SOS_URL } from "../constants";
 import { resolveVbcRequestScope, withAuthHeaders } from "./auth";
 
 const isLocalhost = () => {
@@ -15,9 +15,11 @@ const isLoopbackUrl = (value = "") => {
 const envApiBase = String(process.env.REACT_APP_POWERBI_API_BASE_URL || "").trim();
 const resolvedEnvApiBase =
   envApiBase && (!isLoopbackUrl(envApiBase) || isLocalhost()) ? envApiBase : "";
+const configuredPowerBiBase = String(POWERBI_API_BASE_URL || "").trim();
 
 const BASE = (
   resolvedEnvApiBase ||
+  configuredPowerBiBase ||
   SOS_URL ||
   BACKEND_URL ||
   ""
@@ -108,13 +110,13 @@ export const fetchPowerBiEmbedConfig = async (params = {}, { signal } = {}) => {
 
   const endpoints = [...endpointVariants(primaryUrl)];
 
-  const sosBase = String(SOS_URL || "").trim();
-  const shouldTrySosFallback =
-    sosBase && !primaryUrl.startsWith(sosBase.replace(/\/+$/, ""));
+  const shouldTryConfiguredFallback =
+    configuredPowerBiBase &&
+    !primaryUrl.startsWith(configuredPowerBiBase.replace(/\/+$/, ""));
 
-  if (shouldTrySosFallback) {
+  if (shouldTryConfiguredFallback) {
     const queryString = primaryUrl.includes("?") ? primaryUrl.split("?").slice(1).join("?") : "";
-    const fallbackUrl = `${apiForBase(sosBase, "/api/powerbi/embed-config")}${
+    const fallbackUrl = `${apiForBase(configuredPowerBiBase, "/api/powerbi/embed-config")}${
       queryString ? `?${queryString}` : ""
     }`;
     endpoints.push(...endpointVariants(fallbackUrl));
