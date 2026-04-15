@@ -3,7 +3,7 @@ import { Bell, User, Settings, ChevronDown } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Link, useLocation } from "wouter";
 import { normalizeRole } from "../../lib/rbac";
-import { resolveUserNameParts } from "../../lib/userName";
+
 
 const Header = () => {
   const [location] = useLocation();
