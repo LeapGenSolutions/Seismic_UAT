@@ -11,7 +11,6 @@ const Header = () => {
   const dropdownRef = useRef(null);
   const user = useSelector((state) => state.me.me);
   const displayRole = normalizeRole(user?.role) || "Staff";
-  const { firstName, fullName } = resolveUserNameParts(user || {});
 
   const isActive = (path) => location === path;
 
