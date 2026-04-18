@@ -47,10 +47,7 @@ const Sidebar = () => {
     { required: "reports.billing_history", level: "read" },
     { required: "reports.estimated_billing", level: "read" },
   ]);
-  const canViewSettings = useAnyPermission([
-    { required: "settings.ehr_integration", level: "read" },
-    { required: "settings.payment_billing", level: "read" },
-  ]);
+  const canViewSettings = true;
   const canManageRbac = usePermission("admin.manage_rbac", "read");
   const hasAdminLinks = canViewReports || canViewSettings || canManageRbac;
 
@@ -281,7 +278,7 @@ const Sidebar = () => {
                 aria-label="Settings"
                 className={`flex items-center py-3 cursor-pointer
                   ${isOpen ? "px-4" : "justify-center"}
-                  ${isActive("/settings") ? "bg-blue-600 text-white" : "text-neutral-300 hover:bg-neutral-700"}`}
+                  ${isActive("/settings") || isActive("/profile-settings") ? "bg-blue-600 text-white" : "text-neutral-300 hover:bg-neutral-700"}`}
               >
                 <Settings className={`w-5 h-5 ${isMeetingCompact || !isOpen ? 'mx-auto' : 'mr-3'}`} />
                 <span className={`${isMeetingCompact || !isOpen ? 'hidden' : ''}`}>Settings</span>

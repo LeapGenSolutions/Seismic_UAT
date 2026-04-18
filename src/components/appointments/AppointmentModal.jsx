@@ -10,6 +10,7 @@ import CancelAppointmentModal from "./CancelAppointmentModal";
 import { Pencil, Trash2, XCircle } from "lucide-react";
 import { formatUsDate } from "../../lib/dateUtils";
 import { usePermission } from "../../hooks/use-permission";
+import { Button } from "../ui/button";
 
 const normalizeStatus = (status) => {
   const value = (status || "").toString().trim().toLowerCase();
@@ -185,33 +186,39 @@ const AppointmentModal = ({
 
             <div className="flex gap-4">
               {canEdit && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowEditModal(true)}
                   className="text-gray-700 hover:text-blue-600 transition"
                   title="Edit Appointment"
                 >
                   <Pencil size={20} strokeWidth={1.8} />
-                </button>
+                </Button>
               )}
 
               {canCancel && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowCancelModal(true)}
                   className="text-yellow-600 hover:text-yellow-800 transition"
                   title="Cancel Appointment"
                 >
                   <XCircle size={20} strokeWidth={1.8} />
-                </button>
+                </Button>
               )}
 
               {!selectedAppointment.seismified && canDeleteAppointments && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowDeleteModal(true)}
                   className="text-red-500 hover:text-red-700 transition"
                   title="Delete Appointment"
                 >
                   <Trash2 size={20} strokeWidth={1.8} />
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -259,22 +266,26 @@ const AppointmentModal = ({
               {showDOB ? (
                 <>
                   <span>{formattedDOB}</span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowDOB(false)}
-                    className="text-blue-600 hover:underline text-sm"
+                    className="h-auto px-0 py-0 text-blue-600 hover:bg-transparent hover:text-blue-700"
                   >
                     Hide DOB
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
                   <span>{maskedDOB}</span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowDOB(true)}
-                    className="text-blue-600 hover:underline text-sm"
+                    className="h-auto px-0 py-0 text-blue-600 hover:bg-transparent hover:text-blue-700"
                   >
                     Show DOB
-                  </button>
+                  </Button>
                 </>
               )}
             </p>
@@ -300,9 +311,9 @@ const AppointmentModal = ({
                     <p className="pt-2 font-semibold text-gray-700">Meeting Link:</p>
                     <div className="flex w-full">
                       <input type="text" value={joinLink} readOnly className="flex-grow border border-gray-300 rounded-l-md px-4 py-2" />
-                      <button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-r-md">
+                      <Button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-l-none rounded-r-md">
                         <FaCopy />
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
@@ -312,11 +323,11 @@ const AppointmentModal = ({
 
           <div className="mt-6 text-right space-x-1">
             {isNotCancelled && canJoinCall && (
-              <button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded">Join</button>
+              <Button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white font-medium">Join</Button>
             )}
 
             {canViewPostCall && (
-              <button
+              <Button
                 onClick={handlePostCallClick}
                 disabled={!selectedAppointment.seismified}
                 className={`py-2 px-4 rounded font-medium ${
@@ -326,15 +337,16 @@ const AppointmentModal = ({
                 }`}
               >
                 Post Call Documentation
-              </button>
+              </Button>
             )}
 
-            <button
+            <Button
+              variant="destructive"
               onClick={() => setSelectedAppointment(null)}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Close
-            </button>
+            </Button>
           </div>
         </div>
       </div>

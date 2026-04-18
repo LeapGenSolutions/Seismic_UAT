@@ -9,6 +9,7 @@ import {
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import TeamsDatePicker from "../TeamsDatePicker";
 import { usePermission } from "../../hooks/use-permission";
+import { Button } from "../ui/button";
 
 const viewOptions = [
   { value: "day", label: "Day" },
@@ -95,36 +96,42 @@ const CustomToolbar = ({
     <div className="w-full border-b border-gray-200 bg-white px-4 py-3 flex items-center justify-between gap-4">
 
       <div className="flex items-center gap-2">
-        <button
+        <Button
+          variant="secondary"
           onClick={() => onNavigate("TODAY")}
-          className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-blue-100 hover:bg-blue-200"
+          className="flex items-center gap-1 text-sm bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
         >
           <CalendarIcon size={14} />
           Today
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={() => onNavigate("PREV")}
-          className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 hover:bg-blue-200"
+          className="h-8 w-8 bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
         >
           <ChevronLeft size={16} />
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={() => onNavigate("NEXT")}
-          className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 hover:bg-blue-200"
+          className="h-8 w-8 bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
         >
           <ChevronRight size={16} />
-        </button>
+        </Button>
 
         <div className="relative" ref={datePickerRef}>
-          <button
+          <Button
+            variant="ghost"
             onClick={() => setDatePickerOpen((prev) => !prev)}
-            className="flex items-center gap-1 text-base font-medium px-2 py-1"
+            className="flex items-center gap-1 text-base font-medium px-2 py-1 h-auto"
           >
             {label}
             <ChevronDown size={16} />
-          </button>
+          </Button>
 
           {datePickerOpen && (
             <div className="absolute mt-2 z-30 bg-white border border-blue-200 rounded-lg shadow-lg">
@@ -143,20 +150,22 @@ const CustomToolbar = ({
 
       <div className="flex items-center gap-3 flex-1 justify-center">
         <div className="relative" ref={viewMenuRef}>
-          <button
+          <Button
+            variant="secondary"
             onClick={() => setViewMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1 text-sm bg-blue-100 px-3 py-1.5 rounded-md hover:bg-blue-200"
+            className="flex items-center gap-1 text-sm bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
           >
             <CalendarIcon size={14} />
             {currentViewLabel}
             <ChevronDown size={14} />
-          </button>
+          </Button>
 
           {viewMenuOpen && (
             <div className="absolute right-0 mt-1 w-40 bg-white rounded-md border border-gray-200 shadow-md z-20">
               {viewOptions.map((opt) => (
-                <button
+                <Button
                   key={opt.value}
+                  variant="ghost"
                   className={`block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${view === opt.value
                       ? "text-blue-600 font-medium"
                       : "text-gray-700"
@@ -164,7 +173,7 @@ const CustomToolbar = ({
                   onClick={() => handleViewSelect(opt.value)}
                 >
                   {opt.label}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -181,7 +190,7 @@ const CustomToolbar = ({
       </div>
 
       <div className="relative flex justify-end" ref={addMenuRef}>
-        <button
+        <Button
           disabled={isPastDate() || !canAddAppointment}
           title={
             isPastDate()
@@ -203,10 +212,11 @@ const CustomToolbar = ({
           `}
         >
           + Add <ChevronDown size={14} />
-        </button>
+        </Button>
         {showAddMenu && !isPastDate() && canAddAppointment && (
           <div className="absolute right-0 mt-1 w-40 bg-white rounded-md border border-blue-200 shadow-md z-20 text-sm">
-            <button
+            <Button
+              variant="ghost"
               className="block w-full text-left px-3 py-2 hover:bg-blue-100"
               onClick={() => {
                 setShowAddMenu(false);
@@ -214,9 +224,10 @@ const CustomToolbar = ({
               }}
             >
               Add Appointment
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="ghost"
               className="block w-full text-left px-3 py-2 hover:bg-blue-100"
               onClick={() => {
                 setShowAddMenu(false);
@@ -224,7 +235,7 @@ const CustomToolbar = ({
               }}
             >
               Bulk Upload
-            </button>
+            </Button>
           </div>
         )}
       </div>

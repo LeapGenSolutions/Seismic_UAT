@@ -2,12 +2,17 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, User, Settings, ChevronDown } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Link, useLocation } from "wouter";
+import { normalizeRole } from "../../lib/rbac";
+import { resolveUserNameParts } from "../../lib/userName";
+import { Button } from "../ui/button";
 
 const Header = () => {
   const [location] = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const user = useSelector((state) => state.me.me);
+  const displayRole = normalizeRole(user?.role) || "Staff";
+  const { firstName, fullName } = resolveUserNameParts(user || {});
 
   const isActive = (path) => location === path;
 
@@ -21,6 +26,9 @@ const Header = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const displayName = fullName || "User";
+  const initials = firstName?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <header className="bg-white border-b border-neutral-200">
@@ -89,15 +97,16 @@ const Header = () => {
           )}
 
           {/* Bell Icon */}
-          <button className="p-1.5 sm:p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-full">
+          <Button variant="ghost" size="icon" className="text-neutral-500 hover:text-neutral-700 rounded-full h-9 w-9 sm:h-10 sm:w-10">
             <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+          </Button>
 
           {/* Clickable Avatar */}
           <div className="relative" ref={dropdownRef}>
-            <button
+            <Button
+              variant="ghost"
               onClick={() => setDropdownOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 rounded-full focus:outline-none hover:opacity-80 transition-opacity"
+              className="flex items-center gap-1.5 rounded-full px-2 py-1 h-auto"
               aria-label="Open profile menu"
             >
               {user?.profileImage ? (
@@ -108,15 +117,35 @@ const Header = () => {
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm ring-2 ring-blue-100">
-                  <User className="w-4 h-4" />
+                  {initials}
                 </div>
               )}
               <ChevronDown className={`w-3.5 h-3.5 text-neutral-500 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
-            </button>
+            </Button>
 
             {/* Dropdown */}
             {dropdownOpen && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-neutral-200 z-50 overflow-hidden">
+                {/* User Info Header */}
+                <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-neutral-100">
+                  <div className="flex items-center gap-3">
+                    {user?.profileImage ? (
+                      <img src={user.profileImage} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-neutral-900 truncate">{displayName}</p>
+                      <p className="text-xs text-blue-600 font-medium">{displayRole}</p>
+                      {user?.email && (
+                        <p className="text-xs text-neutral-500 truncate">{user.email}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Menu Items */}
                 <div className="py-1">
                   <Link

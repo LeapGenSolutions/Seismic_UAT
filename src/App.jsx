@@ -19,6 +19,7 @@ import BillingHistory from "./Pages/BillingHistory";
 import BillCalculation from "./Pages/BillCalculation";
 import InvoicePreview from "./Pages/InvoicePreview";
 import Settings from "./Pages/Settings";
+import ProfileSettings from "./Pages/ProfileSettings";
 import AthenaIntegration from "./Pages/AthenaIntegration";
 import PaymentBilling from "./Pages/PaymentBilling";
 import RBACManagement from "./Pages/RBACManagement";
@@ -210,7 +211,7 @@ function Router() {
       {!isPatientView && <Sidebar />}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-neutral-50 p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-neutral-50 p-3 sm:p-4 lg:p-6">
           <Switch>
             <Route path="/about" component={AboutUs} />
             <Route path="/about/details" component={AboutSeismic} />
@@ -298,12 +299,19 @@ function Router() {
               level="read"
             />
             <AuthorizedRoute
+              path="/profile-settings"
+              component={ProfileSettings}
+              allow
+            />
+            <AuthorizedRoute
+              path="/settings/profile"
+              component={ProfileSettings}
+              allow
+            />
+            <AuthorizedRoute
               path="/settings"
               component={Settings}
-              checks={[
-                { required: "settings.ehr_integration", level: "read" },
-                { required: "settings.payment_billing", level: "read" },
-              ]}
+              allow
             />
             <AuthorizedRoute
               path="/settings/ehr-integration"
