@@ -1,5 +1,4 @@
 import { BACKEND_URL } from "../constants";
-import { fetchDoctorsFromHistory } from "../api/callHistory";
 import { appointmentActions } from "./appointment-slice";
 
 const BASE = (BACKEND_URL || "").replace(/\/+$/, "");
@@ -73,50 +72,13 @@ const dedupeAppointments = (appointments) => {
 };
 
 export const fetchAppointmentDetails = (emailInput, clinicName = "") => {
-  return async (dispatch, getState) => {
-    const state = getState();
-    const activeClinicName = clinicName || state.me?.me?.clinicName || "";
+  return async (dispatch) => {
     const emails = normalizeEmails(emailInput);
 
     const fetchAppointments = async () => {
-      const trimmedClinic = String(activeClinicName || "").replace(/\s+/g, " ").trim();
+      const trimmedClinic = String(clinicName || "").replace(/\s+/g, " ").trim();
 
       if (trimmedClinic) {
-        try {
-          const clinicDoctors = await fetchDoctorsFromHistory(trimmedClinic);
-          const clinicEmails = normalizeEmails(
-            (clinicDoctors || []).map((doctor) => doctor?.doctor_email || doctor?.email)
-          );
-
-          if (clinicEmails.length > 0) {
-            const response = await fetch(
-              api(`/api/appointments/${clinicEmails.map(encodeURIComponent).join(",")}`)
-            );
-
-            if (!response.ok) {
-              throw new Error("Could not fetch appointment data!");
-            }
-
-            const payload = await response.json();
-            return dedupeAppointments(normalizeAppointmentPayload(payload)).filter((appointment) => {
-              const appointmentClinic = String(
-                appointment.clinicName ||
-                  appointment.details?.clinicName ||
-                  appointment.original_json?.clinicName ||
-                  appointment.original_json?.details?.clinicName ||
-                  ""
-              )
-                .replace(/\s+/g, " ")
-                .trim()
-                .toLowerCase();
-
-              return !appointmentClinic || appointmentClinic === trimmedClinic.toLowerCase();
-            });
-          }
-        } catch (error) {
-          console.error("Clinic doctor lookup failed, falling back to clinic appointment endpoint:", error);
-        }
-
         const response = await fetch(
           api(`/api/appointments/all?clinicName=${encodeURIComponent(trimmedClinic)}`)
         );
