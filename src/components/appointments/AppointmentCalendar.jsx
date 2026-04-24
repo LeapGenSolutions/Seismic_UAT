@@ -357,24 +357,99 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
   const handleRefresh = useCallback(async () => {
     const { clinicId: practiceId, doctorId: providerId } = getSessionAuthScope();
     const email = (loggedInDoctor?.email || "").toLowerCase();
+    const normalize = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+    const userClinicForComparison = normalize(loggedInDoctor?.clinicName);
+    const userClinicForApi = (loggedInDoctor?.clinicName || "").replace(/\s+/g, " ").trim();
+
+    let doctorsToFetch = selectedDoctors;
+    if (!canSelectProviders) {
+      const myEmail = (loggedInDoctor?.email || "").trim().toLowerCase();
+      if (myEmail) {
+        doctorsToFetch = [myEmail];
+      }
+    }
 
     setIsCalendarLoading(true);
     try {
       const data = await pullAthenaAppointments(email, practiceId, providerId);
+
+      const refreshed = await fetchAppointmentsByDoctorEmails(
+        doctorsToFetch,
+        userClinicForApi
+      );
+
+      let flatData = refreshed;
+      if (
+        Array.isArray(refreshed) &&
+        refreshed.length > 0 &&
+        refreshed[0].data &&
+        Array.isArray(refreshed[0].data)
+      ) {
+        flatData = refreshed.flatMap((day) => day.data || []);
+      } else if (
+        !Array.isArray(refreshed) &&
+        refreshed.data &&
+        Array.isArray(refreshed.data)
+      ) {
+        flatData = refreshed.data;
+      }
+
+      const merged = await applySeismified(flatData);
+      const securedDoctorEmails = new Set(
+        doctorsToFetch.map((doctorEmail) =>
+          (doctorEmail || "").trim().toLowerCase()
+        )
+      );
+
+      const filtered = merged.filter((appt) => {
+        if (userClinicForComparison) {
+          const apptClinic = normalize(
+            appt.clinicName ||
+              appt.details?.clinicName ||
+              appt.original_json?.clinicName ||
+              appt.original_json?.details?.clinicName
+          );
+          if (apptClinic !== userClinicForComparison) return false;
+        } else if (appt.clinicName && appt.clinicName.trim() !== "") {
+          return false;
+        }
+
+        if (securedDoctorEmails.size > 0) {
+          const apptDoctorEmail = (
+            appt.doctor_email ||
+            appt.doctorEmail ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
+          if (!securedDoctorEmails.has(apptDoctorEmail)) return false;
+        }
+
+        return true;
+      });
+
+      setAppointments(filtered);
       toast({
         title: "Appointments Refreshed",
         description: data?.message || "Appointments Pulled Successfully!",
       });
-    } catch {
+    } catch (error) {
       toast({
         title: "Refresh Failed",
-        description: "Could not pull appointments. Please try again.",
+        description:
+          error?.message || "Could not pull appointments. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsCalendarLoading(false);
     }
-  }, [loggedInDoctor, toast]);
+  }, [
+    applySeismified,
+    canSelectProviders,
+    loggedInDoctor,
+    selectedDoctors,
+    toast,
+  ]);
 
   const { components } = useMemo(() => ({
     components: {
