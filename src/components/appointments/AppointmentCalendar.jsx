@@ -270,10 +270,27 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
 
     if (currentView === "day") {
       return (
-        <div title={tooltip}>
-          <span style={{ marginRight: 6 }}>{icon}</span>
-          <b>{eventLabel}</b>
-          <div style={{ fontSize: "11px", opacity: 0.9 }}>{timeRange}</div>
+        <div
+          title={tooltip}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            minWidth: 0,
+            height: "100%",
+            overflow: "hidden",
+          }}
+        >
+          <span style={{ flexShrink: 0 }}>{icon}</span>
+          <b
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {eventLabel}
+          </b>
         </div>
       );
     }
