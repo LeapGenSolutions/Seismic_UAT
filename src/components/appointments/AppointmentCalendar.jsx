@@ -6,11 +6,13 @@ import enUS from "date-fns/locale/en-US";
 import AppointmentModal from "./AppointmentModal";
 import CustomToolbar from "./CustomToolbar";
 import { fetchAppointmentsByDoctorEmails, checkAppointments } from "../../api/callHistory";
+import { pullAthenaAppointments } from "../../api/appointment";
+import { getSessionAuthScope } from "../../api/auth";
 import CreateAppointmentModal from "./CreateAppointmentModal";
 import { useSelector } from "react-redux";
 import CreateBulkAppointments from "./createBulkAppointments";
 import { usePermission } from "../../hooks/use-permission";
-
+import { useToast } from "../../hooks/use-toast";
 import { getColorFromName } from "../../constants/colors";
 
 function capitalizeFirst(str = "") {
@@ -350,6 +352,30 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     }, 200);
   }, []);
 
+  const { toast } = useToast();
+
+  const handleRefresh = useCallback(async () => {
+    const { clinicId: practiceId, doctorId: providerId } = getSessionAuthScope();
+    const email = (loggedInDoctor?.email || "").toLowerCase();
+
+    setIsCalendarLoading(true);
+    try {
+      const data = await pullAthenaAppointments(email, practiceId, providerId);
+      toast({
+        title: "Appointments Refreshed",
+        description: data?.message || "Appointments Pulled Successfully!",
+      });
+    } catch {
+      toast({
+        title: "Refresh Failed",
+        description: "Could not pull appointments. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCalendarLoading(false);
+    }
+  }, [loggedInDoctor, toast]);
+
   const { components } = useMemo(() => ({
     components: {
       event: (props) => <EventCell {...props} currentView={currentView} />,
@@ -360,10 +386,12 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
           onDoctorUpdate={handleDoctorUpdate}
           onAddAppointment={() => setShowCreateModal(true)}
           onAddBulkAppointment={() => setShowBulkCreateModal(true)}
+          onRefresh={handleRefresh}
+          isCalendarLoading={isCalendarLoading}
         />
       ),
     }
-  }), [currentView, selectedDoctors, handleDoctorUpdate]);
+  }), [currentView, selectedDoctors, handleDoctorUpdate, handleRefresh, isCalendarLoading]);
   // Note: dependencies are a bit tricky. CustomToolbar uses setDropdownOpen, setShowCreateModal etc.
   // These are state setters, so stable.
   // We include handleDoctorUpdate which is now a stable callback.
