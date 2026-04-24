@@ -85,7 +85,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     }
   }, [canSelectProviders, loggedInDoctor?.email]);
 
-  const applySeismified = async (list) => {
+  const applySeismified = useCallback(async (list) => {
     const ids = (Array.isArray(list) ? list : [])
       .map((a) => a?.id)
       .filter(Boolean);
@@ -106,7 +106,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
         seismified: false,
       }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!isSelectionInitialized) {
@@ -203,7 +203,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     return () => {
       isActive = false;
     };
-  }, [isSelectionInitialized, selectedDoctors, loggedInDoctor?.clinicName, canSelectProviders, loggedInDoctor?.email]);
+  }, [applySeismified, isSelectionInitialized, selectedDoctors, loggedInDoctor?.clinicName, canSelectProviders, loggedInDoctor?.email]);
 
   const events = appointments.map((appt) => {
     const doctorKey = (appt.doctor_email || appt.doctorEmail || "").trim().toLowerCase();
