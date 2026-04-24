@@ -17,7 +17,7 @@ import { FloatingNotepad } from "../components/ui/floating-notepad";
 const StreamVideoCoreV3 = () => {
   const apiKey = STREAM_API_KEY;
   const me = useSelector((state) => state.me.me)
-  const userId = me.aud;
+  const userId = me.aud || me.email || me.doctor_email ||me.id;
   const { callId } = useParams();
   const searchParams = useSearchParams()[0]
   const patientName = searchParams.get("patient")
@@ -48,6 +48,7 @@ const StreamVideoCoreV3 = () => {
   const [meetingStartTime, setMeetingStartTime] = useState(null);
   const [recordingReminderVisible, setRecordingReminderVisible] = useState(false);
   const [patientApproved, setPatientApproved] = useState(false);
+  const [isCallFull, setIsCallFull] = useState(false);
 
   // Show browser notification
   const showBrowserNotification = (name) => {
@@ -195,10 +196,13 @@ const StreamVideoCoreV3 = () => {
             // Auto leave after showing message
             setShowCall(false);
             setLoading(false);
+            setIsCallFull(true);
             setTimeout(() => {
               window.location.href = "/"; // or replace with navigation to home/dashboard
             }, 5000);
             return;
+          }else{
+            setIsCallFull(false);
           }
 
           // Send join request and wait for approval
@@ -382,9 +386,15 @@ const StreamVideoCoreV3 = () => {
         </div>
       )}
 
-      {!loading && !showCall && !waitingApproval && !rejected && (
+      {!loading && isCallFull && (
         <div style={{ padding: "2rem" }}>
           ⚠️ The call is currently full. You will be redirected in 5 seconds...
+        </div>
+      )}
+      
+      {!loading && !showCall && !waitingApproval && !rejected && !isCallFull && (
+        <div style={{ padding: "2rem" }}>
+          ⚠️ Unable to join the call. Please try again later or contact support.
         </div>
       )}
 
