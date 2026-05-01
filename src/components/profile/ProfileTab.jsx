@@ -82,6 +82,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
     subSpecialty: "",
     statesOfLicense: [],
     licenseNumber: "",
+    transcriptPurging: "7",
   });
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -95,6 +96,9 @@ export default function ProfileTab({ profileData, setProfileData }) {
       subSpecialty: profileData?.subSpecialty || "",
       statesOfLicense: profileData?.statesOfLicense || [],
       licenseNumber: profileData?.licenseNumber || "",
+      transcriptPurging: profileData?.transcript_purging?.[0]?.enabled === "no" 
+        ? "never" 
+        : (profileData?.transcript_purging?.[0]?.time_line || ""),
     });
     setErrors({});
   }, [profileData]);
@@ -148,9 +152,20 @@ export default function ProfileTab({ profileData, setProfileData }) {
       return;
     }
 
+    // Construct backend payload format for purging
+    const payloadFormData = {
+      ...formData,
+      transcript_purging: [
+        {
+          enabled: formData.transcriptPurging === "never" ? "no" : "yes",
+          time_line: formData.transcriptPurging === "never" ? "" : formData.transcriptPurging
+        }
+      ]
+    };
+
     setIsSaving(true);
     try {
-      const response = await updateProfileData(formData);
+      const response = await updateProfileData(payloadFormData);
       if (response.success) {
         setProfileData(response.data);
         toast({
@@ -169,12 +184,12 @@ export default function ProfileTab({ profileData, setProfileData }) {
     }
   };
 
-  const readOnlyInputClass = "bg-gray-50 text-gray-700";
+  const readOnlyInputClass = "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed select-none";
 
   return (
-    <form onSubmit={handleSave} className="space-y-4">
+    <form onSubmit={handleSave} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-blue-50 p-3 text-blue-600">
               <UserCircle2 className="h-5 w-5" />
@@ -190,7 +205,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-sky-50 p-3 text-sky-600">
               <Stethoscope className="h-5 w-5" />
@@ -206,7 +221,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-slate-100 p-3 text-slate-600">
               <Building className="h-5 w-5" />
@@ -362,6 +377,23 @@ export default function ProfileTab({ profileData, setProfileData }) {
             {errors.licenseNumber ? (
               <p className="text-xs text-red-600">{errors.licenseNumber}</p>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="transcriptPurging">Transcript Purging</Label>
+            <div className="relative">
+              <select
+                id="transcriptPurging"
+                name="transcriptPurging"
+                value={formData.transcriptPurging}
+                onChange={handleChange}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="1">1 day</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -534,7 +566,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
         <Button
           type="submit"
           disabled={isSaving}
-          className="bg-blue-600 text-white hover:bg-blue-700"
+          className="bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all duration-200 shadow-md hover:shadow-blue-500/25 px-6 rounded-xl"
         >
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? "Saving..." : "Save Changes"}
