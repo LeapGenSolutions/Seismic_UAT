@@ -160,7 +160,7 @@ const AppointmentModal = ({
     const type = isOnline ? "online" : "inperson";
 
     navigate(
-      `/meeting-room/${appt.id}?patient=${encodeURIComponent(appt.full_name)}&type=${type}`
+      `/meeting-room/${appt.id}?patient=${encodeURIComponent(appt.full_name)}&patientEmail=${encodeURIComponent(appt.email)}&firstName=${encodeURIComponent(appt.first_name)}&lastName=${encodeURIComponent(appt.last_name)}&type=${type}`
     );
   };
 

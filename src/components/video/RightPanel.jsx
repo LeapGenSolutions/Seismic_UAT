@@ -31,6 +31,9 @@ const RightPanel = ({
   doctorName = "",
   doctorEmail = "",
   showChecklist = false,
+  patientEmail,
+  firstName,
+  lastName
 }) => {
   const [location] = useLocation();
   const pathname = location || "";
@@ -165,7 +168,7 @@ const RightPanel = ({
 
   return (
     <>
-      <style>{`:root{ --rightpanel-offset: 320px; }`}</style>
+      <style>{`:root{ --rightpanel-offset: 448px; }`}</style>
       {showChecklist && (
         <div className="md:hidden fixed right-3 bottom-24 z-30">
         <button
@@ -201,7 +204,7 @@ const RightPanel = ({
       <aside
         data-rightpanel
         style={asideStyle}
-        className="hidden md:flex md:flex-col md:fixed md:right-0 w-80 border-l border-neutral-200 bg-white overflow-hidden"
+        className="hidden md:flex md:flex-col md:fixed md:right-0 w-[28rem] border-l border-neutral-200 bg-white overflow-hidden"
       >
         <div className="flex items-center justify-between p-4 border-b border-neutral-100">
           <div>
@@ -266,6 +269,9 @@ const RightPanel = ({
                   appointmentId={appointmentId}
                   doctorName={doctorName}
                   doctorEmail={doctorEmail}
+                  patientEmail={patientEmail}
+                  firstName={firstName}
+                  lastName={lastName}
                 />
               </div>
             </div>

@@ -45,6 +45,7 @@ const buildDoctorName = (me = {}) => {
 
 const StreamVideoCoreV3 = () => {
   const apiKey = STREAM_API_KEY;
+  // const [location] = useLocation();
   const me = useSelector((state) => state.me.me || {});
   const { callId } = useParams();
   const searchParams = useSearchParams()[0];
@@ -55,6 +56,9 @@ const StreamVideoCoreV3 = () => {
   const type = searchParams.get("type") || "online";
   const normalizedType = type.toLowerCase().replace(/[\s_-]/g, "");
   const isInPerson = normalizedType === "inperson";
+  const patientEmail = searchParams.get("patientEmail") || "";
+  const firstName = searchParams.get("firstName") || "";
+  const lastName = searchParams.get("lastName") || "";
 
   const doctorName = buildDoctorName(me);
   const userName =
@@ -484,7 +488,7 @@ const StreamVideoCoreV3 = () => {
         <StreamVideo client={client}>
           <StreamCall call={call}>
             <div className="flex">
-              <div className="flex-1 md:mr-[345px]">
+              <div className="flex-1 md:mr-[448px]">
                 <StreamVideoLayoutV4
                   callId={callId}
                   onRecordingStarted={() => setRecordingReminderVisible(false)}
@@ -496,6 +500,9 @@ const StreamVideoCoreV3 = () => {
                 doctorName={doctorName || userName}
                 doctorEmail={myEmail}
                 showChecklist={role === "doctor"}
+                patientEmail={patientEmail}
+                firstName={firstName}
+                lastName={lastName}
               />
             </div>
           </StreamCall>
