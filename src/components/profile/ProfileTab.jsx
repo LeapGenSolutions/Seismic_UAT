@@ -14,8 +14,10 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { updateProfileData } from "../../api/mockProfileApi";
+
 import { useToast } from "../../hooks/use-toast";
+import { updateProfileData } from "../../api/profileApi";
+import { useSelector } from "react-redux";
 
 const READ_ONLY_NOTE =
   "Read-only fields are part of your registered identity and cannot be changed here.";
@@ -87,6 +89,8 @@ export default function ProfileTab({ profileData, setProfileData }) {
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [licensePopoverOpen, setLicensePopoverOpen] = useState(false);
+  const doctor = useSelector((state) => state.me.me);
+  const doctorId = doctor?.doctor_email || doctor?.email || "user-dynamic";
 
   useEffect(() => {
     setFormData({
@@ -96,6 +100,8 @@ export default function ProfileTab({ profileData, setProfileData }) {
       subSpecialty: profileData?.subSpecialty || "",
       statesOfLicense: profileData?.statesOfLicense || [],
       licenseNumber: profileData?.licenseNumber || "",
+      enable_transcript_purging : profileData?.enable_transcript_purging || "no",
+      transcript_purging_time : profileData?.transcript_purging_time || "never",
       transcriptPurging: profileData?.transcript_purging?.[0]?.enabled === "no" 
         ? "never" 
         : (profileData?.transcript_purging?.[0]?.time_line || ""),
@@ -147,7 +153,6 @@ export default function ProfileTab({ profileData, setProfileData }) {
 
   const handleSave = async (event) => {
     event.preventDefault();
-
     if (!validateForm()) {
       return;
     }
@@ -155,17 +160,13 @@ export default function ProfileTab({ profileData, setProfileData }) {
     // Construct backend payload format for purging
     const payloadFormData = {
       ...formData,
-      transcript_purging: [
-        {
-          enabled: formData.transcriptPurging === "never" ? "no" : "yes",
-          time_line: formData.transcriptPurging === "never" ? "" : formData.transcriptPurging
-        }
-      ]
+      enable_transcript_purging : formData.enable_transcript_purging === "no" ? "no" : "yes",
+      transcript_purging_time : formData.transcript_purging_time === "never" ? "" : formData.transcript_purging_time
     };
 
     setIsSaving(true);
     try {
-      const response = await updateProfileData(payloadFormData);
+      const response = await updateProfileData(doctorId, payloadFormData);
       if (response.success) {
         setProfileData(response.data);
         toast({
@@ -378,24 +379,27 @@ export default function ProfileTab({ profileData, setProfileData }) {
               <p className="text-xs text-red-600">{errors.licenseNumber}</p>
             ) : null}
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="transcriptPurging">Transcript Purging</Label>
-            <div className="relative">
-              <select
-                id="transcriptPurging"
-                name="transcriptPurging"
-                value={formData.transcriptPurging}
-                onChange={handleChange}
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="1">1 day</option>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-              </select>
-            </div>
+            <Label className="text-base font-semibold">
+              Transcript Purging
+            </Label>
+            <select
+              value={formData.transcript_purging_time || "7"}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  transcript_purging_time: e.target.value,
+                  enable_transcript_purging: e.target.value === "never" ? "no" : "yes",
+                }))
+              }
+              className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="never">Never purge transcripts</option>
+              <option value="1">1 day</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+            </select>
           </div>
-
           <div className="space-y-2">
             <Label>State(s) of License</Label>
             <Popover open={licensePopoverOpen} onOpenChange={setLicensePopoverOpen}>
