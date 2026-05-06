@@ -293,7 +293,7 @@ const ReviewPage = ({
                 className="bg-blue-600 text-white hover:bg-blue-700 min-w-[160px] shadow-sm"
                 disabled={status === "posting"}
               >
-                {status === "posting" ? "Posting..." : "Post to Athena"}
+                {status === "posting" ? "Posting..." : "Post to EHR"}
               </Button>
             </>
           )}

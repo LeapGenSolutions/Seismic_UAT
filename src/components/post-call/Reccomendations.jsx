@@ -76,7 +76,7 @@ const PostIconButton = ({ onClick, disabled, globalStatus, postResetKey }) => {
       type="button"
       onClick={handleClick}
       disabled={disabled || normalizedGlobal === "posting"}
-      title="Post to Athena"
+      title="Post to EHR"
       className={`inline-flex items-center justify-center h-7 rounded-md border transition-all ml-2 ${bgClass} ${widthClass}`}
     >
       {icon}
@@ -215,7 +215,7 @@ const Recommendations = ({ appointmentId, username }) => {
 
     } catch (err) {
       // On Error
-      console.error("Failed to post to Athena", err);
+      console.error("Failed to Post to EHR", err);
       setPostError(true);
       setSeismicPostStatus("error");
     } finally {
