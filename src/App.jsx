@@ -37,6 +37,7 @@ import VBCDashboard from "./Pages/VBCDashboard";
 import VBCSummary from "./Pages/VBCSummary";
 import VBCWorkQueue from "./Pages/VBCWorkQueue";
 import ChatbotWindow from "./components/chatbot/ChatbotWindow";
+import BaaGate from "./components/baa/BaaGate";
 import { loginRequest } from "./authConfig";
 import setMyDetails from "./redux/me-actions";
 import { store } from "./redux/store";
@@ -69,7 +70,8 @@ async function verifyStandaloneSession(idToken) {
     throw new Error("Invalid ID token");
   }
 
-  const response = await fetch(`${BACKEND_URL}api/standalone/auth/verify`, {
+  const baseUrl = (BACKEND_URL || "").replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/api/standalone/auth/verify`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -343,6 +345,17 @@ function AppShellSkeleton() {
   );
 }
 
+function AuthorizedApp({ me }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BaaGate user={me} fallback={<AppShellSkeleton />}>
+        <Router />
+        <Toaster />
+      </BaaGate>
+    </QueryClientProvider>
+  );
+}
+
 function Main() {
   const isAuthenticated = useIsAuthenticated();
   const [tokenBypass, setTokenBypass] = useState(false);
@@ -467,10 +480,7 @@ function Main() {
         ) : me?.approvalStatus === "rejected" ? (
           rejectedApprovalDenied
         ) : hasAppRole ? (
-          <QueryClientProvider client={queryClient}>
-            <Router />
-            <Toaster />
-          </QueryClientProvider>
+          <AuthorizedApp me={me} />
         ) : (
           accessDenied
         )
@@ -480,10 +490,7 @@ function Main() {
         </AuthenticatedTemplate>
       ) : hasAppRole ? (
         <AuthenticatedTemplate>
-          <QueryClientProvider client={queryClient}>
-            <Router />
-            <Toaster />
-          </QueryClientProvider>
+          <AuthorizedApp me={me} />
         </AuthenticatedTemplate>
       ) : (
         <AuthenticatedTemplate>{accessDenied}</AuthenticatedTemplate>
