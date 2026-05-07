@@ -962,7 +962,7 @@ const Soap = ({
                         : ""
                     }
                   >
-                    {isFullyPosted ? "SOAP Already Posted" : "Post SOAP to Athena"}
+                    {isFullyPosted ? "SOAP Already Posted" : "Post Soap to EHR"}
                   </Button>
                 )}
               </>

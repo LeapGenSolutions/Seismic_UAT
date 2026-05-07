@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRecommendationByAppointment } from "../../api/recommendations";
 import ReactMarkdown from "react-markdown";
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Copy, Check, Send, AlertCircle, CheckCircle2, X } from "lucide-react";
 import LoadingCard from "./LoadingCard";
 import UpToDate from "./UpToDate";
@@ -106,7 +107,7 @@ const CopyIconButton = ({ text, label }) => {
       className={`inline-flex items-center justify-center h-7 rounded-md border transition-all whitespace-nowrap ${
         copied
           ? "bg-green-50 text-green-700 border-green-300"
-          : "bg-white text-slate-700 border-slate-200 hover:text-blue-600 hover:border-blue-400"
+          : "bg-white text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400"
       } ${copied ? "px-2 gap-1.5" : "w-7"}`}
     >
       {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -121,7 +122,83 @@ const CopyIconButton = ({ text, label }) => {
 
 // --- MAIN COMPONENT ---
 
-const Recommendations = ({ appointmentId, username }) => {
+const stripSeismicHeading = (value = "") =>
+  String(value)
+    .replace(
+      /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:seismic(?:'s|’s)?\s+)?independent recommendations(?:\s+for the patient)?(?:\*\*)?\s*:?\s*\n+/i,
+      ""
+    )
+    .trim();
+
+const findSectionHeading = (text, sectionName) => {
+  const headingText =
+    sectionName.toLowerCase() === "seismic"
+      ? `(?:(?:seismic(?:'s|’s)?\\s+)?independent\\s+recommendations|seismic(?:'s|’s)?\\s+recommendations)`
+      : `${sectionName}(?:'s|’s)?\\s+recommendations`;
+  const headingRegex = new RegExp(
+    `(^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?${headingText}(?:\\s+for\\s+the\\s+patient)?(?:\\*\\*)?\\s*:?\\s*(?=\\n|$)`,
+    "i"
+  );
+  const match = text.match(headingRegex);
+  if (!match) return null;
+
+  const leadingBreakLength = match[1] ? match[1].length : 0;
+  return {
+    index: match.index + leadingBreakLength,
+    end: match.index + match[0].length,
+  };
+};
+
+const splitRecommendationSections = (raw) => {
+  if (!raw) {
+    return {
+      doctorText: null,
+      seismicText: "No recommendations available.",
+    };
+  }
+
+  const formattedText = String(raw)
+    .replaceAll("####", "## ")
+    .replaceAll("###", "# ")
+    .trim();
+  const doctorHeading = findSectionHeading(formattedText, "Doctor");
+  const seismicHeading = findSectionHeading(formattedText, "Seismic");
+
+  if (doctorHeading && seismicHeading) {
+    if (doctorHeading.index < seismicHeading.index) {
+      return {
+        doctorText: formattedText
+          .substring(doctorHeading.index, seismicHeading.index)
+          .trim(),
+        seismicText: formattedText.substring(seismicHeading.index).trim(),
+      };
+    }
+
+    return {
+      doctorText: formattedText.substring(doctorHeading.index).trim(),
+      seismicText: formattedText
+        .substring(seismicHeading.index, doctorHeading.index)
+        .trim(),
+    };
+  }
+
+  if (doctorHeading) {
+    return {
+      doctorText: formattedText.substring(doctorHeading.index).trim(),
+      seismicText:
+        doctorHeading.index > 0
+          ? formattedText.substring(0, doctorHeading.index).trim()
+          : "No independent recommendations.",
+    };
+  }
+
+  return {
+    doctorText: null,
+    seismicText: formattedText,
+  };
+};
+
+const Recommendations = ({ appointmentId, username, appointment }) => {
   const [active, setActive] = useState("recommendations");
   
   // States for Posting Flow
@@ -135,6 +212,16 @@ const Recommendations = ({ appointmentId, username }) => {
   // Track if notes have already been posted in this session
   const [hasPosted, setHasPosted] = useState(false);
 
+  const isAthenaAppointment = useMemo(() => {
+    const hasAthenaIds = Boolean(
+      appointment?.athena_encounter_id && appointment?.athena_practice_id
+    );
+    const athenaLikeCallId = String(appointmentId || "")
+      .toLowerCase()
+      .startsWith("athena");
+    return hasAthenaIds || athenaLikeCallId;
+  }, [appointment, appointmentId]);
+
   const { data: recommendations, isLoading, error } = useQuery({
     queryKey: ["recommendations", appointmentId, username],
     queryFn: () =>
@@ -145,46 +232,25 @@ const Recommendations = ({ appointmentId, username }) => {
   });
 
   const { doctorText, seismicText } = useMemo(() => {
-    const raw = recommendations?.data?.recommendations;
-    if (!raw) return { doctorText: null, seismicText: "No recommendations available." };
-
-    const formattedText = raw.replaceAll("####", "## ").replaceAll("###", "# ");
-    
-    let doctor = null;
-    let seismic = formattedText;
-
-    const docMatch = formattedText.match(/#+\s*Doctor/i);
-    const seismicMatch = formattedText.match(/#+\s*Seismic/i);
-
-    if (docMatch && seismicMatch) {
-      const docIndex = docMatch.index;
-      const seisIndex = seismicMatch.index;
-      
-      if (docIndex < seisIndex) {
-        doctor = formattedText.substring(docIndex, seisIndex).trim();
-        seismic = formattedText.substring(seisIndex).trim();
-      } else {
-        seismic = formattedText.substring(0, docIndex).trim();
-        doctor = formattedText.substring(docIndex).trim();
-      }
-    } else if (docMatch) {
-      const docIndex = docMatch.index;
-      seismic = docIndex > 0 ? formattedText.substring(0, docIndex).trim() : "No independent recommendations.";
-      doctor = formattedText.substring(docIndex).trim();
-    }
-
-    return { doctorText: doctor, seismicText: seismic };
+    return splitRecommendationSections(recommendations?.data?.recommendations);
   }, [recommendations]);
+
+  const seismicDisplayText = useMemo(
+    () => stripSeismicHeading(seismicText),
+    [seismicText]
+  );
 
 
   const handleInitiatePost = () => {
     setPostError(false);
+    setSeismicPostStatus("idle");
     setShowConfirmModal(true);
   };
 
   const handleCancelPost = () => {
     setShowConfirmModal(false);
     setPostError(false);
+    setSeismicPostStatus("idle");
     setResetKey((prev) => prev + 1); 
   };
 
@@ -194,10 +260,6 @@ const Recommendations = ({ appointmentId, username }) => {
     setSeismicPostStatus("posting");
 
     try {
-      // TODO: Replace with your actual API PUT/POST request to Athena
-      // await postRecommendationsToAthena(appointmentId, username, seismicText);
-      
-      // Simulating a network request delay
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
       // On Success
@@ -218,6 +280,9 @@ const Recommendations = ({ appointmentId, username }) => {
       console.error("Failed to Post to EHR", err);
       setPostError(true);
       setSeismicPostStatus("error");
+      setTimeout(() => {
+        setSeismicPostStatus((status) => (status === "error" ? "idle" : status));
+      }, 3000);
     } finally {
       setIsPosting(false);
     }
@@ -227,131 +292,177 @@ const Recommendations = ({ appointmentId, username }) => {
   if (isLoading) return <LoadingCard message="From symptoms to strategy… aligning recommendations." />;
   if (error) return <LoadingCard />;
 
-  return (
-    <div className="relative h-full flex flex-col">
-      <style>{`
-        .markdown h1 { font-size: 1.5rem; font-weight: bold; margin-top: 0.5rem; margin-bottom: 0.5rem;}
-        .markdown h2 { font-size: 1.1rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #1e293b;}
-        .markdown p { line-height: 1.6; margin: 0.5rem 0; color: #334155;}
-        .markdown ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #334155;}
-        .markdown li { margin-bottom: 0.25rem; }
-      `}</style>
+  const confirmPostModal =
+    showConfirmModal && typeof document !== "undefined"
+      ? createPortal(
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                Confirm Post
+              </h3>
 
-      {/* HEADER & TABS */}
-      <div className="mb-4 shrink-0">
-        <h2 className="text-2xl font-semibold text-slate-900">Recommendations</h2>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={() => setActive("recommendations")}
-            className={`px-6 py-2 rounded-md border shadow-sm text-sm font-medium transition-colors ${
-              active === "recommendations" ? "bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Recommendations
-          </button>
-          <button
-            onClick={() => setActive("uptodate")}
-            className={`px-6 py-2 rounded-md border shadow-sm text-sm font-medium transition-colors ${
-              active === "uptodate" ? "bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            UpToDate
-          </button>
-        </div>
-      </div>
+              <p className={`mb-6 ${hasPosted ? "text-amber-600 font-medium" : "text-slate-600"}`}>
+                {hasPosted
+                  ? "Seismic Independent recommendations already posted to EHR. Do you want to post again?"
+                  : "Do you want to post Seismic Independent Recommendations to EHR?"}
+              </p>
 
-      {/* CONTENT AREA */}
-      <div className="mb-6 flex-grow flex flex-col">
-        {active === "recommendations" ? (
-          <div className="space-y-6 flex-grow">
-            
-            {/* DOCTOR SECTION */}
-            {doctorText && (
-              <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden p-5 markdown prose max-w-none">
-                <ReactMarkdown>{doctorText}</ReactMarkdown>
-              </div>
-            )}
+              {postError && (
+                <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm font-medium text-red-800">
+                    Failed to post. Please try again.
+                  </span>
+                </div>
+              )}
 
-            {/* SEISMIC SECTION */}
-            <div className="bg-white border border-blue-100 shadow-sm rounded-lg overflow-hidden relative">
-              <div className="absolute top-4 right-4 flex items-center z-10">
-                <CopyIconButton 
-                  text={seismicText} 
-                  label="Seismic Notes" 
-                />
-                <PostIconButton 
-                  onClick={handleInitiatePost} 
-                  disabled={!seismicText || seismicText.includes("No independent recommendations")}
-                  globalStatus={seismicPostStatus}
-                  postResetKey={resetKey}
-                />
-              </div>
-              
-              <div className="p-5 markdown prose max-w-none">
-                <ReactMarkdown>{seismicText}</ReactMarkdown>
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  onClick={handleCancelPost}
+                  disabled={isPosting}
+                  className="px-4 py-2 rounded-md border border-slate-300 shadow-sm text-sm font-medium bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={executePostToAthena}
+                  disabled={isPosting}
+                  className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white transition-colors min-w-[100px] flex justify-center items-center
+                    ${isPosting ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}
+                  `}
+                >
+                  {isPosting ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Post to EHR"
+                  )}
+                </button>
               </div>
             </div>
+          </div>,
+          document.body
+        )
+      : null;
 
+  return (
+    <div className="relative space-y-6 text-gray-900 leading-relaxed">
+      <style>{`
+        .markdown {
+          color: #111827;
+          font-size: 15px;
+        }
+        .markdown > :first-child {
+          margin-top: 0;
+        }
+        .markdown > :last-child {
+          margin-bottom: 0;
+        }
+        .markdown h1,
+        .markdown h2,
+        .markdown h3 {
+          color: #111827;
+          font-size: 1rem;
+          font-weight: 700;
+          line-height: 1.4;
+          margin: 1rem 0 0.35rem;
+        }
+        .markdown h1:first-child,
+        .markdown h2:first-child,
+        .markdown h3:first-child {
+          margin-top: 0;
+        }
+        .markdown p {
+          color: #111827;
+          line-height: 1.55;
+          margin: 0.35rem 0;
+        }
+        .markdown ul,
+        .markdown ol {
+          color: #111827;
+          margin: 0.35rem 0 0.9rem;
+          padding-left: 1.75rem;
+        }
+        .markdown ul {
+          list-style-type: disc;
+        }
+        .markdown li {
+          line-height: 1.55;
+          margin: 0.2rem 0;
+          padding-left: 0.1rem;
+        }
+        .markdown strong {
+          color: #111827;
+          font-weight: 700;
+        }
+      `}</style>
+
+      <h3 className="font-semibold text-black text-lg">Recommendations</h3>
+
+      <div className="flex flex-wrap gap-3">
+        {[
+          ["recommendations", "Recommendations"],
+          ["uptodate", "UpToDate"],
+        ].map(([tab, label]) => (
+          <button
+            key={tab}
+            onClick={() => setActive(tab)}
+            className={`px-5 py-2 rounded-md text-sm font-medium border ${
+              active === tab
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-black-700 border-black-300"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        {active === "recommendations" ? (
+          <div className="space-y-9">
+            {doctorText && (
+              <section className="pt-1 markdown prose max-w-none">
+                <ReactMarkdown>{doctorText}</ReactMarkdown>
+              </section>
+            )}
+
+            <section className="pt-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <p className="text-lg font-semibold leading-7 text-black">
+                  Seismic Independent Recommendations for the Patient
+                </p>
+                <div className="flex shrink-0 items-center self-start">
+                  <CopyIconButton
+                    text={seismicDisplayText}
+                    label="to EHR"
+                  />
+                  {isAthenaAppointment && (
+                    <PostIconButton
+                      onClick={handleInitiatePost}
+                      disabled={
+                        !seismicDisplayText ||
+                        seismicDisplayText.includes("No independent recommendations")
+                      }
+                      globalStatus={seismicPostStatus}
+                      postResetKey={resetKey}
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 markdown prose max-w-none">
+                <ReactMarkdown>{seismicDisplayText}</ReactMarkdown>
+              </div>
+            </section>
           </div>
         ) : (
-          <div className="flex-grow">
+          <div>
             <UpToDate appId={appointmentId} username={username} data={recommendations?.data} />
           </div>
         )}
       </div>
 
-      {/* ==========================================
-          CONFIRMATION MODAL
-          ========================================== */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              Confirm Action
-            </h3>
-            
-            {/* DYNAMIC TEXT BASED ON hasPosted STATE */}
-            <p className={`mb-6 ${hasPosted ? "text-amber-600 font-medium" : "text-slate-600"}`}>
-              {hasPosted 
-                ? "Seismic Independent recommendations already posted. Do you want to post again?" 
-                : "Do you want to post seismic independent recommendations to Athena?"}
-            </p>
-
-            {postError && (
-              <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <span className="text-sm font-medium text-red-800">
-                  Failed to post. Please try again.
-                </span>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 mt-2">
-              <button
-                onClick={handleCancelPost}
-                disabled={isPosting}
-                className="px-4 py-2 rounded-md border border-slate-300 shadow-sm text-sm font-medium bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              
-              <button
-                onClick={executePostToAthena}
-                disabled={isPosting}
-                className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white transition-colors min-w-[100px] flex justify-center items-center
-                  ${isPosting ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}
-                `}
-              >
-                {isPosting ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  "Post"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmPostModal}
 
       {/* ==========================================
           SUCCESS TOAST
@@ -364,7 +475,7 @@ const Recommendations = ({ appointmentId, username }) => {
             </div>
             
             <span className="font-medium text-green-800 text-sm pr-4">
-              Successfully posted to Athena!
+              Successfully posted to EHR!
             </span>
             
             <button
