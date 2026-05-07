@@ -125,9 +125,14 @@ const CopyIconButton = ({ text, label }) => {
 const stripSeismicHeading = (value = "") =>
   String(value)
     .replace(
-      /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:seismic(?:'s|’s)?\s+)?independent recommendations(?:\s+for the patient)?(?:\*\*)?\s*:?\s*\n+/i,
+      /^\s*(?:#{1,6}\s*)?(?:\d+\.\s*)?(?:\*\*)?(?:seismic(?:'s|’s)?\s+)?independent recommendations(?:\s+for the patient)?(?:\*\*)?\s*:?\s*\n+/i,
       ""
     )
+    .trim();
+
+const stripHeadingNumber = (value = "") =>
+  String(value)
+    .replace(/^(\s*(?:#{1,6}\s*)?)(?:\d+\.\s*)/, "$1")
     .trim();
 
 const findSectionHeading = (text, sectionName) => {
@@ -136,7 +141,7 @@ const findSectionHeading = (text, sectionName) => {
       ? `(?:(?:seismic(?:'s|’s)?\\s+)?independent\\s+recommendations|seismic(?:'s|’s)?\\s+recommendations)`
       : `${sectionName}(?:'s|’s)?\\s+recommendations`;
   const headingRegex = new RegExp(
-    `(^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?${headingText}(?:\\s+for\\s+the\\s+patient)?(?:\\*\\*)?\\s*:?\\s*(?=\\n|$)`,
+    `(^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\d+\\.\\s*)?(?:\\*\\*)?${headingText}(?:\\s+for\\s+the\\s+patient)?(?:\\*\\*)?\\s*:?\\s*(?=\\n|$)`,
     "i"
   );
   const match = text.match(headingRegex);
@@ -148,6 +153,11 @@ const findSectionHeading = (text, sectionName) => {
     end: match.index + match[0].length,
   };
 };
+
+const startsWithDoctorRecommendations = (value = "") =>
+  /^\s*(?:#{1,6}\s*)?(?:\d+\.\s*)?(?:\*\*)?doctor(?:'s|’s)?\s+recommendations(?:\s+for\s+the\s+patient)?/i.test(
+    String(value)
+  );
 
 const splitRecommendationSections = (raw) => {
   if (!raw) {
@@ -235,9 +245,19 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
     return splitRecommendationSections(recommendations?.data?.recommendations);
   }, [recommendations]);
 
+  const doctorDisplayText = useMemo(
+    () => stripHeadingNumber(doctorText || ""),
+    [doctorText]
+  );
+
   const seismicDisplayText = useMemo(
     () => stripSeismicHeading(seismicText),
     [seismicText]
+  );
+
+  const seismicBlockStartsWithDoctor = useMemo(
+    () => startsWithDoctorRecommendations(seismicDisplayText),
+    [seismicDisplayText]
   );
 
 
@@ -421,36 +441,38 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
       <div>
         {active === "recommendations" ? (
           <div className="space-y-9">
-            {doctorText && (
+            {doctorDisplayText && (
               <section className="pt-1 markdown prose max-w-none">
-                <ReactMarkdown>{doctorText}</ReactMarkdown>
+                <ReactMarkdown>{doctorDisplayText}</ReactMarkdown>
               </section>
             )}
 
             <section className="pt-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <p className="text-lg font-semibold leading-7 text-black">
-                  Seismic Independent Recommendations for the Patient
-                </p>
-                <div className="flex shrink-0 items-center self-start">
-                  <CopyIconButton
-                    text={seismicDisplayText}
-                    label="to EHR"
-                  />
-                  {isAthenaAppointment && (
-                    <PostIconButton
-                      onClick={handleInitiatePost}
-                      disabled={
-                        !seismicDisplayText ||
-                        seismicDisplayText.includes("No independent recommendations")
-                      }
-                      globalStatus={seismicPostStatus}
-                      postResetKey={resetKey}
+              {!seismicBlockStartsWithDoctor && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <p className="text-lg font-semibold leading-7 text-black">
+                    Seismic Independent Recommendations for the Patient
+                  </p>
+                  <div className="flex shrink-0 items-center self-start">
+                    <CopyIconButton
+                      text={seismicDisplayText}
+                      label="to EHR"
                     />
-                  )}
+                    {isAthenaAppointment && (
+                      <PostIconButton
+                        onClick={handleInitiatePost}
+                        disabled={
+                          !seismicDisplayText ||
+                          seismicDisplayText.includes("No independent recommendations")
+                        }
+                        globalStatus={seismicPostStatus}
+                        postResetKey={resetKey}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-2 markdown prose max-w-none">
+              )}
+              <div className={seismicBlockStartsWithDoctor ? "markdown prose max-w-none" : "mt-2 markdown prose max-w-none"}>
                 <ReactMarkdown>{seismicDisplayText}</ReactMarkdown>
               </div>
             </section>
@@ -464,9 +486,6 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
 
       {confirmPostModal}
 
-      {/* ==========================================
-          SUCCESS TOAST
-          ========================================== */}
       {showSuccessToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
           <div className="bg-green-50 border border-green-200 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
