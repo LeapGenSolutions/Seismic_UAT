@@ -100,7 +100,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
       subSpecialty: profileData?.subSpecialty || "",
       statesOfLicense: profileData?.statesOfLicense || [],
       licenseNumber: profileData?.licenseNumber || "",
-      enable_transcript_purging : profileData?.enable_transcript_purging || "no",
+      enable_transcript_purging : profileData?.enable_transcript_purging || "yes",
       transcript_purging_time : profileData?.transcript_purging_time || "never",
       transcriptPurging: profileData?.transcript_purging?.[0]?.enabled === "no" 
         ? "never" 
@@ -160,7 +160,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
     // Construct backend payload format for purging
     const payloadFormData = {
       ...formData,
-      enable_transcript_purging : formData.enable_transcript_purging === "no" ? "no" : "yes",
+      enable_transcript_purging : "yes",
       transcript_purging_time : formData.transcript_purging_time === "never" ? "" : formData.transcript_purging_time
     };
 
@@ -388,8 +388,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  transcript_purging_time: e.target.value,
-                  enable_transcript_purging: e.target.value === "never" ? "no" : "yes",
+                  transcript_purging_time: e.target.value
                 }))
               }
               className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

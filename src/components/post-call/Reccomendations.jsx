@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchRecommendationByAppointment } from "../../api/recommendations";
+import { fetchRecommendationByAppointment, postRecommendationsToAthena } from "../../api/recommendations";
 import ReactMarkdown from "react-markdown";
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -280,15 +280,26 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
     setSeismicPostStatus("posting");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // On Success
-      setShowConfirmModal(false);
-      setSeismicPostStatus("success");
-      setShowSuccessToast(true);
-      
-      // Update state so the app knows we've posted at least once
-      setHasPosted(true); 
+      const result = await postRecommendationsToAthena(
+        appointmentId,
+        username,
+        seismicDisplayText,
+        appointment?.athena_encounter_id,
+        appointment?.athena_practice_id
+      );
+
+      const success = result?.success || false;
+      if(!success) {
+        setPostError(true);
+        setSeismicPostStatus("error");
+      } else {
+        // On Success
+        setShowConfirmModal(false);
+        setSeismicPostStatus("success");
+        setShowSuccessToast(true);
+        // Update state so the app knows we've posted at least once
+        setHasPosted(true); 
+      }
       
       setTimeout(() => {
         setShowSuccessToast(false);
