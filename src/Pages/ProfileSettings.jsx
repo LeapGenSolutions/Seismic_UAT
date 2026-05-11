@@ -54,37 +54,7 @@ export default function ProfileSettings() {
         });
         setLoading(false);
       }, 400);
-      return;
     }
-
-    setProfileData({
-      id: "user-dynamic",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      primaryEmail: "",
-      secondaryEmail: "",
-      role: "Doctor",
-      accountType: "Clinic",
-      npiNumber: "",
-      specialty: "",
-      subSpecialty: "",
-      statesOfLicense: [],
-      licenseNumber: "",
-      clinicName: "",
-      clinicAddress: "",
-      clinicId: "",
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      notifications: { email: true, sms: false },
-      timeZone: "America/Los_Angeles",
-      security: {
-        authenticationMethod: "Single sign-on",
-        passwordManagedBy: "Clinic identity provider",
-        sessionProtection: "Audit-safe controls enabled",
-      },
-    });
-    setLoading(false);
   }, [me]);
 
   if (loading) {

@@ -1,19 +1,11 @@
 export const formatUsDate = (raw) => {
   if (!raw) return "—";
 
-  const dateOnly = String(raw).trim().split("T")[0];
+  // Handle ISO or yyyy-mm-dd
+  const dateOnly = String(raw).split("T")[0]; // yyyy-mm-dd
+  const [yyyy, mm, dd] = dateOnly.split("-");
 
-  const isoMatch = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const [, yyyy, mm, dd] = isoMatch;
-    return `${mm}/${dd}/${yyyy}`;
-  }
+  if (!yyyy || !mm || !dd) return "—";
 
-  const usMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (usMatch) {
-    const [, mm, dd, yyyy] = usMatch;
-    return `${mm.padStart(2, "0")}/${dd.padStart(2, "0")}/${yyyy}`;
-  }
-
-  return "—";
+  return `${mm}/${dd}/${yyyy}`; // MM/DD/YYYY
 };

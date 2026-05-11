@@ -6,6 +6,7 @@ import {
   normalizeRole,
   SYSTEM_ROLES,
 } from "../lib/rbac";
+import { resolveUserNameParts } from "../lib/userName";
 
 const asRoleList = (value) => {
   if (Array.isArray(value)) {
@@ -21,8 +22,8 @@ const asRoleList = (value) => {
 
 const setMyDetails = (details) => {
   return async (dispatch) => {
-    const fallbackEmail = details.email || details.userData?.email || details.emails?.[0] || "";
-    const email = fallbackEmail.toLowerCase();
+    const email = details.email?.toLowerCase();
+    const emailHandle = details.email?.split("@")[0] || "";
 
     // fetch doctor metadata from doctors container
     let doctors = [];
@@ -37,30 +38,15 @@ const setMyDetails = (details) => {
     const doctorDoc = doctors.find(
       (doc) =>
         doc.doctor_email?.toLowerCase() === email ||
-        doc.id?.toLowerCase() === email ||
-        doc.userId === details.userId
+        doc.id?.toLowerCase() === email
     );
 
-    const detailRole = details.role || details.userData?.role || details.roles || details.userData?.roles;
-    const normalizedRole = normalizeRole(doctorDoc?.role || detailRole);
+    const normalizedRole = normalizeRole(doctorDoc?.role || details.role || details.roles);
     let customRolePermissions = null;
-    const clinicName = doctorDoc?.clinicName || details.clinicName || details.userData?.clinicName || "";
-    const firstName = details.firstName || details.userData?.firstName || details.given_name || "";
-    const lastName = details.lastName || details.userData?.lastName || details.family_name || "";
-    const profileComplete =
-      doctorDoc?.profileComplete ??
-      details.profileComplete ??
-      details.userData?.profileComplete ??
-      false;
-    const approvalStatus =
-      doctorDoc?.approvalStatus ??
-      details.approvalStatus ??
-      details.userData?.approvalStatus ??
-      (profileComplete ? "approved" : null);
 
     if (normalizedRole && !SYSTEM_ROLES.includes(normalizedRole)) {
       try {
-        const roles = asRoleList(await fetchRoles(clinicName));
+        const roles = asRoleList(await fetchRoles(doctorDoc?.clinicName || ""));
         const matchedRole = roles.find(
           (roleDoc) => normalizeRole(roleDoc?.roleName) === normalizedRole
         );
@@ -70,56 +56,41 @@ const setMyDetails = (details) => {
       }
     }
 
-    const fullName =
-      [doctorDoc?.firstName, doctorDoc?.lastName].filter(Boolean).join(" ") ||
-      details.fullName ||
-      details.name ||
-      [firstName, lastName].filter(Boolean).join(" ") ||
-      details.given_name ||
-      email?.split("@")[0] ||
-      "";
+    const { firstName, lastName, fullName } = resolveUserNameParts({
+      firstName: doctorDoc?.firstName,
+      lastName: doctorDoc?.lastName,
+      fullName: details.name,
+      given_name: details.given_name,
+      family_name: details.family_name,
+      doctor_name: doctorDoc?.doctor_name,
+    });
+    const resolvedFullName = fullName || emailHandle;
 
     const payload = {
       ...details,
       email,
-      doctor_name: doctorDoc?.doctor_name || fullName,
-      doctor_id: doctorDoc?.doctor_id || doctorDoc?.id || details.doctor_id || details.userId,
+      doctor_name: doctorDoc?.doctor_name || resolvedFullName,
+      doctor_id: doctorDoc?.doctor_id || doctorDoc?.id,
       doctor_email: doctorDoc?.doctor_email || email,
-      specialization:
-        doctorDoc?.specialization ||
-        doctorDoc?.specialty ||
-        details.specialization ||
-        details.specialty ||
-        details.userData?.specialization ||
-        details.userData?.specialty,
-      given_name: fullName,
-      family_name: doctorDoc?.lastName || lastName || details.family_name,
-      name: fullName,
-      fullName,
+      specialization: doctorDoc?.specialization || doctorDoc?.specialty,
+      given_name: firstName || details.given_name || emailHandle,
+      family_name: lastName || details.family_name,
+      name: resolvedFullName,
+      fullName: resolvedFullName,
       role: normalizedRole,
       roles: Array.isArray(doctorDoc?.roles)
         ? doctorDoc.roles
-        : Array.isArray(details.roles)
-        ? details.roles
-        : Array.isArray(details.userData?.roles)
-        ? details.userData.roles
         : normalizedRole
         ? [normalizedRole]
         : [],
-      specialty:
-        doctorDoc?.specialty ||
-        doctorDoc?.specialization ||
-        details.specialty ||
-        details.specialization ||
-        details.userData?.specialty ||
-        details.userData?.specialization,
-      clinicName,
-      profileComplete,
-      approvalStatus,
-      customPermissions: doctorDoc?.customPermissions || details.customPermissions || details.userData?.customPermissions || null,
+      specialty: doctorDoc?.specialty || doctorDoc?.specialization,
+      clinicName: doctorDoc?.clinicName || "",
+      profileComplete: doctorDoc?.profileComplete,
+      approvalStatus: doctorDoc?.approvalStatus || (doctorDoc?.profileComplete ? "approved" : null),
+      customPermissions: doctorDoc?.customPermissions || null,
       effectivePermissions: computeEffectivePermissions(
         normalizedRole,
-        doctorDoc?.customPermissions || details.customPermissions || details.userData?.customPermissions,
+        doctorDoc?.customPermissions,
         customRolePermissions
       ),
     };

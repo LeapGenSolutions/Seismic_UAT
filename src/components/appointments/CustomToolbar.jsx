@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import TeamsDatePicker from "../TeamsDatePicker";
@@ -26,6 +27,8 @@ const CustomToolbar = ({
   onDoctorUpdate,
   onAddAppointment,
   onAddBulkAppointment,
+  onRefresh = () => {},
+  isCalendarLoading = false,
 }) => {
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -96,42 +99,36 @@ const CustomToolbar = ({
     <div className="w-full border-b border-gray-200 bg-white px-4 py-3 flex items-center justify-between gap-4">
 
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
+        <button
           onClick={() => onNavigate("TODAY")}
-          className="flex items-center gap-1 text-sm bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
+          className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-blue-100 hover:bg-blue-200"
         >
           <CalendarIcon size={14} />
           Today
-        </Button>
+        </button>
 
-        <Button
-          variant="secondary"
-          size="icon"
+        <button
           onClick={() => onNavigate("PREV")}
-          className="h-8 w-8 bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
+          className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 hover:bg-blue-200"
         >
           <ChevronLeft size={16} />
-        </Button>
+        </button>
 
-        <Button
-          variant="secondary"
-          size="icon"
+        <button
           onClick={() => onNavigate("NEXT")}
-          className="h-8 w-8 bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
+          className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 hover:bg-blue-200"
         >
           <ChevronRight size={16} />
-        </Button>
+        </button>
 
         <div className="relative" ref={datePickerRef}>
-          <Button
-            variant="ghost"
+          <button
             onClick={() => setDatePickerOpen((prev) => !prev)}
-            className="flex items-center gap-1 text-base font-medium px-2 py-1 h-auto"
+            className="flex items-center gap-1 text-base font-medium px-2 py-1"
           >
             {label}
             <ChevronDown size={16} />
-          </Button>
+          </button>
 
           {datePickerOpen && (
             <div className="absolute mt-2 z-30 bg-white border border-blue-200 rounded-lg shadow-lg">
@@ -150,22 +147,20 @@ const CustomToolbar = ({
 
       <div className="flex items-center gap-3 flex-1 justify-center">
         <div className="relative" ref={viewMenuRef}>
-          <Button
-            variant="secondary"
+          <button
             onClick={() => setViewMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1 text-sm bg-blue-100 hover:bg-blue-200 text-gray-900 shadow-none"
+            className="flex items-center gap-1 text-sm bg-blue-100 px-3 py-1.5 rounded-md hover:bg-blue-200"
           >
             <CalendarIcon size={14} />
             {currentViewLabel}
             <ChevronDown size={14} />
-          </Button>
+          </button>
 
           {viewMenuOpen && (
             <div className="absolute right-0 mt-1 w-40 bg-white rounded-md border border-gray-200 shadow-md z-20">
               {viewOptions.map((opt) => (
-                <Button
+                <button
                   key={opt.value}
-                  variant="ghost"
                   className={`block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${view === opt.value
                       ? "text-blue-600 font-medium"
                       : "text-gray-700"
@@ -173,7 +168,7 @@ const CustomToolbar = ({
                   onClick={() => handleViewSelect(opt.value)}
                 >
                   {opt.label}
-                </Button>
+                </button>
               ))}
             </div>
           )}
@@ -189,55 +184,66 @@ const CustomToolbar = ({
         )}
       </div>
 
-      <div className="relative flex justify-end" ref={addMenuRef}>
+      <div className="flex items-center gap-2 justify-end">
         <Button
-          disabled={isPastDate() || !canAddAppointment}
-          title={
-            isPastDate()
-              ? "Appointments cannot be added for past dates"
-              : !canAddAppointment
-              ? "You do not have permission to add appointments"
-              : ""
-          }
-          onClick={() => {
-            if (!isPastDate() && canAddAppointment) {
-              setShowAddMenu((prev) => !prev);
-            }
-          }}
-          className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-md
-            ${isPastDate() || !canAddAppointment
-              ? "bg-gray-300 cursor-default text-gray-600"
-              : "bg-blue-600 text-white hover:bg-blue-700"
-            }
-          `}
+          type="button"
+          variant="outline"
+          onClick={onRefresh}
+          disabled={isCalendarLoading}
         >
-          + Add <ChevronDown size={14} />
+          <RefreshCw className={`h-4 w-4 sm:mr-2 ${isCalendarLoading ? "animate-spin" : ""}`} />
+          <span className="hidden sm:inline">
+            {isCalendarLoading ? "Refreshing..." : "Refresh"}
+          </span>
         </Button>
-        {showAddMenu && !isPastDate() && canAddAppointment && (
-          <div className="absolute right-0 mt-1 w-40 bg-white rounded-md border border-blue-200 shadow-md z-20 text-sm">
-            <Button
-              variant="ghost"
-              className="block w-full text-left px-3 py-2 hover:bg-blue-100"
-              onClick={() => {
-                setShowAddMenu(false);
-                onAddAppointment();
-              }}
-            >
-              Add Appointment
-            </Button>
 
-            <Button
-              variant="ghost"
-              className="block w-full text-left px-3 py-2 hover:bg-blue-100"
-              onClick={() => {
-                setShowAddMenu(false);
-                onAddBulkAppointment();
-              }}
-            >
-              Bulk Upload
-            </Button>
-          </div>
-        )}
+        <div className="relative" ref={addMenuRef}>
+          <Button
+            disabled={isPastDate() || !canAddAppointment}
+            title={
+              isPastDate()
+                ? "Appointments cannot be added for past dates"
+                : !canAddAppointment
+                ? "You do not have permission to add appointments"
+                : ""
+            }
+            onClick={() => {
+              if (!isPastDate() && canAddAppointment) {
+                setShowAddMenu((prev) => !prev);
+              }
+            }}
+            className={
+              isPastDate() || !canAddAppointment
+                ? "bg-gray-300 cursor-default text-gray-600"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }
+          >
+            + Add <ChevronDown size={14} />
+          </Button>
+          {showAddMenu && !isPastDate() && canAddAppointment && (
+            <div className="absolute right-0 mt-1 w-40 bg-white rounded-md border border-blue-200 shadow-md z-20 text-sm">
+              <button
+                className="block w-full text-left px-3 py-2 hover:bg-blue-100"
+                onClick={() => {
+                  setShowAddMenu(false);
+                  onAddAppointment();
+                }}
+              >
+                Add Appointment
+              </button>
+
+              <button
+                className="block w-full text-left px-3 py-2 hover:bg-blue-100"
+                onClick={() => {
+                  setShowAddMenu(false);
+                  onAddBulkAppointment();
+                }}
+              >
+                Bulk Upload
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
