@@ -9,9 +9,40 @@ import { checkAppointments } from "../api/callHistory";
 import CallHistory from "./CallHistory";
 import { useToast } from "../hooks/use-toast";
 import { PageNavigation } from "../components/ui/page-navigation";
+import { Button } from "../components/ui/button";
 import CreateAppointmentModal from "../components/appointments/CreateAppointmentModal";
 import { usePermission } from "../hooks/use-permission";
-import { Button } from "../components/ui/button";
+import { resolveUserNameParts } from "../lib/userName";
+
+const normalizeNameValue = (value = "") =>
+  String(value).replace(/\s+/g, " ").trim();
+
+const stripHonorific = (value = "") =>
+  normalizeNameValue(value).replace(
+    /^(dr|mr|mrs|ms|miss)\.?\s+/i,
+    ""
+  );
+
+const getVideoCallDisplayName = (user = {}) => {
+  const { firstName, lastName, fullName } = resolveUserNameParts(user);
+  const pageCandidate = stripHonorific(
+    user.fullName ||
+      user.name ||
+      [user.given_name, user.family_name].filter(Boolean).join(" ") ||
+      fullName ||
+      user.doctor_name
+  );
+  const candidateParts = pageCandidate.split(" ").filter(Boolean);
+
+  if (candidateParts.length >= 2) {
+    return `${candidateParts[0]} ${candidateParts[1]}`;
+  }
+
+  const normalizedFirstName = stripHonorific(firstName).split(" ")[0] || "";
+  const primaryLastName = normalizeNameValue(lastName).split(" ")[0] || "";
+
+  return [normalizedFirstName, primaryLastName].filter(Boolean).join(" ").trim() || pageCandidate;
+};
 
 const VideoCallPage = () => {
   const [room, setRoom] = useState("");
@@ -25,7 +56,8 @@ const VideoCallPage = () => {
   const [seismifiedIds, setSeismifiedIds] = useState([]);
   const isLoadingUpcoming = useState(false)[0];
   const dispatch = useDispatch();
-  const userName = useSelector((state) => state.me.me.given_name);
+  const me = useSelector((state) => state.me.me || {});
+  const userName = getVideoCallDisplayName(me);
   const myEmail = useSelector((state) => state.me.me.email);
   const clinicName = useSelector((state) => state.me.me.clinicName);
   const appointments = useSelector((state) => state.appointments.appointments);
@@ -222,7 +254,9 @@ const VideoCallPage = () => {
     navigate(
       `/meeting-room/${encodeURIComponent(room)}?patient=${encodeURIComponent(
         selectedAppointment.full_name
-      )}`
+      )}&patientEmail=${encodeURIComponent(selectedAppointment.email)}
+      &firstName=${encodeURIComponent(selectedAppointment.first_name)}
+      &lastName=${encodeURIComponent(selectedAppointment.last_name)}`
     );
   };
 
@@ -256,7 +290,7 @@ const VideoCallPage = () => {
           role === "doctor" && activeTab === "upcoming" && canAddVideoCall ? (
             <Button
               onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 text-white text-sm hover:bg-blue-700 shadow-sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               + Add
             </Button>
@@ -271,8 +305,7 @@ const VideoCallPage = () => {
               {/* Tabs */}
               <div className="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500 mb-4">
                 {role === "doctor" && canViewUpcoming && (
-                  <Button
-                    variant="ghost"
+                  <button
                     onClick={() => setActiveTab("upcoming")}
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${activeTab === "upcoming"
                       ? "bg-white text-gray-900 shadow-sm"
@@ -280,12 +313,11 @@ const VideoCallPage = () => {
                       }`}
                   >
                     Upcoming Calls
-                  </Button>
+                  </button>
                 )}
 
                 {role === "patient" && (
-                  <Button
-                    variant="ghost"
+                  <button
                     onClick={() => setActiveTab("join")}
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${activeTab === "join"
                       ? "bg-white text-gray-900 shadow-sm"
@@ -293,12 +325,11 @@ const VideoCallPage = () => {
                       }`}
                   >
                     Join by ID
-                  </Button>
+                  </button>
                 )}
 
                 {role === "doctor" && canViewHistory && (
-                  <Button
-                    variant="ghost"
+                  <button
                     onClick={() => setActiveTab("history")}
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${activeTab === "history"
                       ? "bg-white text-gray-900 shadow-sm"
@@ -306,7 +337,7 @@ const VideoCallPage = () => {
                       }`}
                   >
                     Call History
-                  </Button>
+                  </button>
                 )}
               </div>
 
@@ -346,9 +377,9 @@ const VideoCallPage = () => {
 
                       <div className="flex space-x-4">
                         <div className="flex items-center space-x-2">
-                          <input
-                            type="radio"
-                            id="in-person"
+                        <input
+                          type="radio"
+                          id="in-person"
                             name="appointmentType"
                             value="in-person"
                             checked={appointmentType === "in-person"}
@@ -364,8 +395,8 @@ const VideoCallPage = () => {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <input
-                            type="radio"
+                        <input
+                          type="radio"
                             id="online"
                             name="appointmentType"
                             value="online"
@@ -449,7 +480,7 @@ const VideoCallPage = () => {
                     <div className="flex justify-end space-x-2 mt-4">
                       <Button
                         onClick={() => joinAsDoctor(room)}
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-blue-600 hover:bg-blue-700 text-white h-10 px-4 py-2"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <FaVideo className="mr-2" />
                         Start Video Call
@@ -469,7 +500,7 @@ const VideoCallPage = () => {
                           </p>
                           <Button
                             onClick={copyToClipboard}
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded"
+                            className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
                           >
                             <FaCopy className="w-4 h-4" />
                             Copy
@@ -513,7 +544,7 @@ const VideoCallPage = () => {
                     <Button
                       onClick={() => joinAsParticipant(room, userName)}
                       disabled={!room || !userName}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-blue-600 hover:bg-blue-700 text-white h-10 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       Join Call
                     </Button>

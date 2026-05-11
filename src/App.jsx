@@ -33,22 +33,16 @@ import Documentation from "./Pages/Documentation";
 import AuthPage from "./Pages/AuthPage";
 import StreamVideoCoreV3 from "./Pages/StreamVideoCoreV3";
 import TimelineDashboard from "./Pages/TimelineDashboard";
+import VBCDashboard from "./Pages/VBCDashboard";
+import VBCSummary from "./Pages/VBCSummary";
+import VBCWorkQueue from "./Pages/VBCWorkQueue";
+import ChatbotWindow from "./components/chatbot/ChatbotWindow";
+import BaaGate from "./components/baa/BaaGate";
 import { loginRequest } from "./authConfig";
 import setMyDetails from "./redux/me-actions";
 import { store } from "./redux/store";
 import { normalizeRole } from "./lib/rbac";
 import { BACKEND_URL } from "./constants";
-import {
-  AUTH_TYPE_CIAM,
-  AUTH_TYPE_MSAL,
-  clearLegacyStandaloneBootstrap,
-  clearStandaloneSession,
-  getStoredAuthType,
-  getStoredBackendToken,
-  hasStoredStandaloneSession,
-  setStoredAuthType,
-  setStoredBackendToken,
-} from "./lib/auth-storage";
 
 const queryClient = new QueryClient();
 
@@ -76,7 +70,8 @@ async function verifyStandaloneSession(idToken) {
     throw new Error("Invalid ID token");
   }
 
-  const response = await fetch(`${BACKEND_URL}api/standalone/auth/verify`, {
+  const baseUrl = (BACKEND_URL || "").replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/api/standalone/auth/verify`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -100,90 +95,11 @@ async function verifyStandaloneSession(idToken) {
   }
 
   if (data?.token) {
-    setStoredBackendToken(data.token);
+    sessionStorage.setItem("backendToken", data.token);
   }
 
-  setStoredAuthType(AUTH_TYPE_CIAM);
-  clearLegacyStandaloneBootstrap();
-
-  return {
-    ...claims,
-    ...data,
-    ...(data?.userData || {}),
-    email: data?.email || claims.email || claims.emails?.[0] || "",
-    userId: data?.userId || claims.sub || claims.oid || "",
-    doctor_id: data?.doctor_id || data?.userId || claims.sub || claims.oid || "",
-    doctor_email: data?.doctor_email || data?.email || claims.email || claims.emails?.[0] || "",
-    profileComplete: data?.profileComplete,
-    approvalStatus: data?.approvalStatus ?? data?.userData?.approvalStatus ?? null,
-    clinicName: data?.clinicName || data?.userData?.clinicName || "",
-    specialty: data?.specialty || data?.userData?.specialty || "",
-    specialization: data?.specialization || data?.userData?.specialty || "",
-    firstName: data?.firstName || data?.userData?.firstName || claims.given_name || "",
-    lastName: data?.lastName || data?.userData?.lastName || claims.family_name || "",
-  };
+  return claims;
 }
-
-async function fetchStandaloneProfile(backendToken) {
-  if (!backendToken) {
-    throw new Error("Missing backend token");
-  }
-
-  const response = await fetch(`${BACKEND_URL}api/standalone/profile`, {
-    headers: {
-      Authorization: `Bearer ${backendToken}`,
-    },
-  });
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.message || data?.error || "Failed to restore standalone session");
-  }
-
-  setStoredAuthType(AUTH_TYPE_CIAM);
-
-  const firstName = data?.firstName || "";
-  const lastName = data?.lastName || "";
-  const fullName = [firstName, lastName].filter(Boolean).join(" ");
-
-  return {
-    ...data,
-    email: data?.email || data?.doctor_email || "",
-    userId: data?.userId || data?.doctor_id || "",
-    doctor_id: data?.doctor_id || data?.userId || "",
-    doctor_email: data?.doctor_email || data?.email || "",
-    profileComplete: data?.profileComplete ?? false,
-    approvalStatus: data?.approvalStatus ?? (data?.profileComplete ? "approved" : null),
-    given_name: firstName,
-    family_name: lastName,
-    name: data?.doctor_name || fullName || data?.email || "",
-    fullName: data?.doctor_name || fullName || "",
-    specialty: data?.specialty || data?.specialization || "",
-    specialization: data?.specialization || data?.specialty || "",
-  };
-}
-
-function scrubTokenParamFromUrl() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has("token")) {
-    return;
-  }
-
-  url.searchParams.delete("token");
-  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
-  window.history.replaceState({}, document.title, nextUrl || "/");
-}
-
 function Router() {
   const queryParams = new URLSearchParams(window.location.search);
   const role = queryParams.get("role");
@@ -207,7 +123,7 @@ function Router() {
   ];
 
   return (
-     <div className="h-screen flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
       {!isPatientView && <Sidebar />}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
@@ -338,6 +254,36 @@ function Router() {
               level="read"
             />
             <AuthorizedRoute
+              path="/vbc"
+              component={VBCSummary}
+              required="dashboard.view_appointments"
+              level="read"
+            />
+            <AuthorizedRoute
+              path="/vbc/summary"
+              component={VBCSummary}
+              required="dashboard.view_appointments"
+              level="read"
+            />
+            <AuthorizedRoute
+              path="/vbc/work-queue"
+              component={VBCWorkQueue}
+              required="dashboard.view_appointments"
+              level="read"
+            />
+            <AuthorizedRoute
+              path="/vbc/details"
+              component={VBCDashboard}
+              required="dashboard.view_appointments"
+              level="read"
+            />
+            <AuthorizedRoute
+              path="/vbc-dashboard"
+              component={VBCSummary}
+              required="dashboard.view_appointments"
+              level="read"
+            />
+            <AuthorizedRoute
               path="/admin/rbac"
               component={RBACManagement}
               required="admin.manage_rbac"
@@ -361,31 +307,61 @@ function Router() {
             />
             <Route component={NotFound} />
           </Switch>
+          <ChatbotWindow />
         </main>
       </div>
     </div>
   );
 }
 
+function AppShellSkeleton() {
+  return (
+    <div className="flex min-h-screen bg-neutral-50">
+      <div className="hidden md:flex flex-col w-64 bg-neutral-800 p-4 gap-4">
+        <div className="h-10 w-32 bg-neutral-700 rounded animate-pulse" />
+        <div className="space-y-3 mt-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-8 bg-neutral-700 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <div className="h-14 bg-white border-b border-neutral-200 flex items-center px-6 gap-4">
+          <div className="h-4 w-24 bg-neutral-200 rounded animate-pulse" />
+          <div className="h-4 w-16 bg-neutral-200 rounded animate-pulse" />
+          <div className="ml-auto h-8 w-8 bg-neutral-200 rounded-full animate-pulse" />
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="h-20 bg-white rounded-xl shadow-sm animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-40 bg-white rounded-xl shadow-sm animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthorizedApp({ me }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BaaGate user={me} fallback={<AppShellSkeleton />}>
+        <Router />
+        <Toaster />
+      </BaaGate>
+    </QueryClientProvider>
+  );
+}
+
 function Main() {
   const isAuthenticated = useIsAuthenticated();
-  const [tokenBypass, setTokenBypass] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const queryParams = new URLSearchParams(window.location.search);
-    return Boolean(queryParams.get("token")) || hasStoredStandaloneSession();
-  });
-  const [isAuthorizing, setIsAuthorizing] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const queryParams = new URLSearchParams(window.location.search);
-    return Boolean(queryParams.get("token")) || hasStoredStandaloneSession();
-  });
-  const { instance, accounts } = useMsal();
+  const [tokenBypass, setTokenBypass] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [hasBootstrappedAuth, setHasBootstrappedAuth] = useState(false);
+  const { instance, accounts, inProgress } = useMsal();
   const dispatch = useDispatch();
   const me = useSelector((state) => state.me.me);
   const hasAppRole = Boolean(normalizeRole(me?.role));
@@ -398,8 +374,11 @@ function Main() {
         account: accounts[0],
       });
 
-      clearStandaloneSession();
-      setStoredAuthType(AUTH_TYPE_MSAL);
+      const scopedToken = response.idToken || response.accessToken || "";
+      if (scopedToken) {
+        sessionStorage.setItem("authToken", scopedToken);
+      }
+
       await dispatch(setMyDetails(response.idTokenClaims));
     } finally {
       setIsAuthorizing(false);
@@ -410,55 +389,44 @@ function Main() {
     let isMounted = true;
 
     async function hydrateUser() {
+      if (inProgress !== "none") {
+        return;
+      }
+
       setIsAuthorizing(true);
       try {
         const queryParams = new URLSearchParams(window.location.search);
         const tokenFromUrl = queryParams.get("token");
-        const storedBackendToken = getStoredBackendToken();
-        const authType = getStoredAuthType();
-        const shouldRestoreStandalone =
-          Boolean(tokenFromUrl) ||
-          authType === AUTH_TYPE_CIAM ||
-          Boolean(storedBackendToken);
+        const storedToken = sessionStorage.getItem("bypassToken");
+        const activeToken = tokenFromUrl || storedToken;
 
-        if (shouldRestoreStandalone) {
+        if (activeToken) {
+          if (tokenFromUrl) {
+            sessionStorage.setItem("bypassToken", tokenFromUrl);
+            sessionStorage.setItem("authToken", tokenFromUrl);
+          }
+
           try {
-            const standaloneDetails = tokenFromUrl
-              ? await verifyStandaloneSession(tokenFromUrl)
-              : await fetchStandaloneProfile(storedBackendToken);
-
-            await dispatch(setMyDetails(standaloneDetails));
-            scrubTokenParamFromUrl();
-
+            const claims = await verifyStandaloneSession(activeToken);
+            await dispatch(setMyDetails(claims));
             if (isMounted) {
               setTokenBypass(true);
             }
           } catch (error) {
             console.error("Standalone session verification failed:", error);
-            clearStandaloneSession();
-            if (isMounted) {
-              setTokenBypass(false);
-            }
+            sessionStorage.removeItem("bypassToken");
+            sessionStorage.removeItem("backendToken");
           }
           return;
         }
 
         if (isAuthenticated) {
           await requestProfileData();
-          if (isMounted) {
-            setTokenBypass(false);
-          }
-        } else {
-          if (authType !== AUTH_TYPE_MSAL) {
-            clearStandaloneSession();
-          }
-          if (isMounted) {
-            setTokenBypass(false);
-          }
         }
       } finally {
         if (isMounted) {
           setIsAuthorizing(false);
+          setHasBootstrappedAuth(true);
         }
       }
     }
@@ -469,7 +437,7 @@ function Main() {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [inProgress, isAuthenticated]);
 
   const accessDenied = (
     <AccessDenied
@@ -496,33 +464,15 @@ function Main() {
     />
   );
 
+  if (!hasBootstrappedAuth || inProgress !== "none") {
+    return <AppShellSkeleton />;
+  }
+
   return (
     <>
       {tokenBypass ? (
         isAuthorizing ? (
-          <div className="flex min-h-screen bg-neutral-50">
-            {/* Skeleton sidebar */}
-            <div className="hidden md:flex flex-col w-64 bg-neutral-800 p-4 gap-4">
-              <div className="h-10 w-32 bg-neutral-700 rounded animate-pulse" />
-              <div className="space-y-3 mt-6">
-                {[1,2,3,4].map(i => <div key={i} className="h-8 bg-neutral-700 rounded animate-pulse" />)}
-              </div>
-            </div>
-            {/* Skeleton content */}
-            <div className="flex-1 flex flex-col">
-              <div className="h-14 bg-white border-b border-neutral-200 flex items-center px-6 gap-4">
-                <div className="h-4 w-24 bg-neutral-200 rounded animate-pulse" />
-                <div className="h-4 w-16 bg-neutral-200 rounded animate-pulse" />
-                <div className="ml-auto h-8 w-8 bg-neutral-200 rounded-full animate-pulse" />
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="h-20 bg-white rounded-xl shadow-sm animate-pulse" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[1,2,3].map(i => <div key={i} className="h-40 bg-white rounded-xl shadow-sm animate-pulse" />)}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AppShellSkeleton />
         ) : me?.profileComplete !== true ? (
           registrationDenied
         ) : me?.approvalStatus === "pending" ? (
@@ -530,51 +480,23 @@ function Main() {
         ) : me?.approvalStatus === "rejected" ? (
           rejectedApprovalDenied
         ) : hasAppRole ? (
-          <QueryClientProvider client={queryClient}>
-            <Router />
-            <Toaster />
-          </QueryClientProvider>
+          <AuthorizedApp me={me} />
         ) : (
           accessDenied
         )
       ) : isAuthorizing && isAuthenticated ? (
         <AuthenticatedTemplate>
-          <div className="flex min-h-screen bg-neutral-50">
-            {/* Skeleton sidebar */}
-            <div className="hidden md:flex flex-col w-64 bg-neutral-800 p-4 gap-4">
-              <div className="h-10 w-32 bg-neutral-700 rounded animate-pulse" />
-              <div className="space-y-3 mt-6">
-                {[1,2,3,4].map(i => <div key={i} className="h-8 bg-neutral-700 rounded animate-pulse" />)}
-              </div>
-            </div>
-            {/* Skeleton content */}
-            <div className="flex-1 flex flex-col">
-              <div className="h-14 bg-white border-b border-neutral-200 flex items-center px-6 gap-4">
-                <div className="h-4 w-24 bg-neutral-200 rounded animate-pulse" />
-                <div className="h-4 w-16 bg-neutral-200 rounded animate-pulse" />
-                <div className="ml-auto h-8 w-8 bg-neutral-200 rounded-full animate-pulse" />
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="h-20 bg-white rounded-xl shadow-sm animate-pulse" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[1,2,3].map(i => <div key={i} className="h-40 bg-white rounded-xl shadow-sm animate-pulse" />)}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AppShellSkeleton />
         </AuthenticatedTemplate>
       ) : hasAppRole ? (
         <AuthenticatedTemplate>
-          <QueryClientProvider client={queryClient}>
-            <Router />
-            <Toaster />
-          </QueryClientProvider>
+          <AuthorizedApp me={me} />
         </AuthenticatedTemplate>
       ) : (
         <AuthenticatedTemplate>{accessDenied}</AuthenticatedTemplate>
       )}
 
-      {!isAuthenticated && !tokenBypass && !isAuthorizing && (
+      {!isAuthenticated && !tokenBypass && (
         <UnauthenticatedTemplate>
           <AuthPage />
         </UnauthenticatedTemplate>

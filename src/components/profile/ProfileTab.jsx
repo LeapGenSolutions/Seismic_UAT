@@ -14,8 +14,10 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { updateProfileData } from "../../api/mockProfileApi";
+
 import { useToast } from "../../hooks/use-toast";
+import { updateProfileData } from "../../api/profileApi";
+import { useSelector } from "react-redux";
 
 const READ_ONLY_NOTE =
   "Read-only fields are part of your registered identity and cannot be changed here.";
@@ -82,10 +84,13 @@ export default function ProfileTab({ profileData, setProfileData }) {
     subSpecialty: "",
     statesOfLicense: [],
     licenseNumber: "",
+    transcriptPurging: "7",
   });
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [licensePopoverOpen, setLicensePopoverOpen] = useState(false);
+  const doctor = useSelector((state) => state.me.me);
+  const doctorId = doctor?.doctor_email || doctor?.email || "user-dynamic";
 
   useEffect(() => {
     setFormData({
@@ -95,6 +100,11 @@ export default function ProfileTab({ profileData, setProfileData }) {
       subSpecialty: profileData?.subSpecialty || "",
       statesOfLicense: profileData?.statesOfLicense || [],
       licenseNumber: profileData?.licenseNumber || "",
+      enable_transcript_purging : profileData?.enable_transcript_purging || "no",
+      transcript_purging_time : profileData?.transcript_purging_time || "never",
+      transcriptPurging: profileData?.transcript_purging?.[0]?.enabled === "no" 
+        ? "never" 
+        : (profileData?.transcript_purging?.[0]?.time_line || ""),
     });
     setErrors({});
   }, [profileData]);
@@ -143,14 +153,20 @@ export default function ProfileTab({ profileData, setProfileData }) {
 
   const handleSave = async (event) => {
     event.preventDefault();
-
     if (!validateForm()) {
       return;
     }
 
+    // Construct backend payload format for purging
+    const payloadFormData = {
+      ...formData,
+      enable_transcript_purging : formData.enable_transcript_purging === "no" ? "no" : "yes",
+      transcript_purging_time : formData.transcript_purging_time === "never" ? "" : formData.transcript_purging_time
+    };
+
     setIsSaving(true);
     try {
-      const response = await updateProfileData(formData);
+      const response = await updateProfileData(doctorId, payloadFormData);
       if (response.success) {
         setProfileData(response.data);
         toast({
@@ -169,12 +185,12 @@ export default function ProfileTab({ profileData, setProfileData }) {
     }
   };
 
-  const readOnlyInputClass = "bg-gray-50 text-gray-700";
+  const readOnlyInputClass = "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed select-none";
 
   return (
-    <form onSubmit={handleSave} className="space-y-4">
+    <form onSubmit={handleSave} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-blue-50 p-3 text-blue-600">
               <UserCircle2 className="h-5 w-5" />
@@ -190,7 +206,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-sky-50 p-3 text-sky-600">
               <Stethoscope className="h-5 w-5" />
@@ -206,7 +222,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm">
+        <Card className="border border-neutral-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-md">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-full bg-slate-100 p-3 text-slate-600">
               <Building className="h-5 w-5" />
@@ -363,7 +379,27 @@ export default function ProfileTab({ profileData, setProfileData }) {
               <p className="text-xs text-red-600">{errors.licenseNumber}</p>
             ) : null}
           </div>
-
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">
+              Transcript Purging
+            </Label>
+            <select
+              value={formData.transcript_purging_time || "7"}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  transcript_purging_time: e.target.value,
+                  enable_transcript_purging: e.target.value === "never" ? "no" : "yes",
+                }))
+              }
+              className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="never">Never purge transcripts</option>
+              <option value="1">1 day</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </div>
           <div className="space-y-2">
             <Label>State(s) of License</Label>
             <Popover open={licensePopoverOpen} onOpenChange={setLicensePopoverOpen}>
@@ -534,7 +570,7 @@ export default function ProfileTab({ profileData, setProfileData }) {
         <Button
           type="submit"
           disabled={isSaving}
-          className="bg-blue-600 text-white hover:bg-blue-700"
+          className="bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all duration-200 shadow-md hover:shadow-blue-500/25 px-6 rounded-xl"
         >
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? "Saving..." : "Save Changes"}

@@ -1,14 +1,16 @@
 import { useRef, useState, useEffect, useCallback} from "react";
 import { createPortal } from "react-dom";
-import { CHATBOT_URL } from "../../constants";
+import { BACKEND_URL, CHATBOT_URL } from "../../constants";
 import { useLocation } from "wouter";
 import { usePermission } from "../../hooks/use-permission";
+import { useSelector } from "react-redux";
 
 
 
 const ChatbotWindow = () => {
     const canAccessChatbot = usePermission("chatbot.access", "read");
     const [open, setOpen] = useState(false);
+    const [token, setToken] = useState(null);
     const [minimized, setMinimized] = useState(false);
     const [iframeKey, setIframeKey] = useState(Date.now()); // for reload/close
     const iframeRef = useRef();
@@ -21,7 +23,34 @@ const ChatbotWindow = () => {
     const chatbotWindowRef = useRef(null);
     const resizeStartRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
     const HANDLE_TOP_LEFT = true;
+    const loggedInDoctor = useSelector((state) => state.me.me);
+    const doctors = useSelector((state) => state.doctors?.doctors || []);
+    const doctorinfo = doctors.find(doc => doc.email === loggedInDoctor?.email || doc.doctor_email === loggedInDoctor?.email);
+    const fetchToken = useCallback(async () => {
+        try{
+            const response = await fetch(`${BACKEND_URL}/api/chat-bot/get-token`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(doctorinfo)
+            });
+            if(!response.ok){
+                throw new Error("Failed to fetch chatbot token");
+            }
+            const data = await response.json();
+            setToken(data.token);
+        } catch (error) {
+            console.error("Error fetching chatbot token:", error);
+            throw error;
+        }
+    }, [doctorinfo]);
 
+    useEffect(() => {
+        if (open && !token) {
+            fetchToken();
+        }
+    }, [open, token, fetchToken]);
+
+    console.log(`${CHATBOT_URL}?token=${token}`);
     const onPointerDownResize = useCallback((e) => {
         // use pointer events to support mouse/touch/pen
         const point = e.touches ? e.touches[0] : e;
@@ -182,7 +211,6 @@ const ChatbotWindow = () => {
                 right: isMeetingPage ? "auto" : 24,
                 zIndex: 100,
                 resize: minimized ? undefined : "both",
-                overflow: "hidden",
                 minWidth: minimized ? 165 : 320,
                 minHeight: minimized ? 48 : 400,
                 maxWidth: 600,
@@ -193,7 +221,10 @@ const ChatbotWindow = () => {
                 border: "1px solid #e5e7eb",
                 width: minimized ? 165 : windowSize.width,
                 height: minimized ? 45 : windowSize.height,
-                transition: "all 0.2s"
+                transition: "all 0.2s",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden"
             }}
         >
             {/* Header with controls */}
@@ -272,13 +303,15 @@ const ChatbotWindow = () => {
             <iframe
                 key={iframeKey}
                 ref={iframeRef}
-                src={CHATBOT_URL}
+                src={`${CHATBOT_URL}?token=${token}`}
                 title="Chatbot"
-                width="100%"
-                height="100%"
                 style={{
-                    border: "none", display: minimized ? "none" : "block",
-                    minWidth: 336, minHeight: 400, borderRadius: 12
+                    border: "none",
+                    display: minimized ? "none" : "block",
+                    flex: 1,
+                    minHeight: 0,
+                    width: "100%",
+                    borderRadius: 0 // let parent handle rounding
                 }}
                 allow="clipboard-write;"
             />

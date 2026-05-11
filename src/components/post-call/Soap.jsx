@@ -293,7 +293,7 @@ const ReviewPage = ({
                 className="bg-blue-600 text-white hover:bg-blue-700 min-w-[160px] shadow-sm"
                 disabled={status === "posting"}
               >
-                {status === "posting" ? "Posting..." : "Post to Athena"}
+                {status === "posting" ? "Posting..." : "Post to EHR"}
               </Button>
             </>
           )}
@@ -962,7 +962,7 @@ const Soap = ({
                         : ""
                     }
                   >
-                    {isFullyPosted ? "SOAP Already Posted" : "Post SOAP to Athena"}
+                    {isFullyPosted ? "SOAP Already Posted" : "Post Soap to EHR"}
                   </Button>
                 )}
               </>

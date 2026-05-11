@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { ChevronDown } from "lucide-react";
 import { getColorFromName } from "../constants/colors";
 import { fetchDoctors } from "../redux/doctors-actions";
-import { AUTH_TYPE_CIAM, getStoredAuthType, getStoredBackendToken } from "../lib/auth-storage";
 
 export const doctorColorMap = {};
 
@@ -46,8 +45,8 @@ const DoctorMultiSelect = ({
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const isCIAMUser =
-          getStoredAuthType() === AUTH_TYPE_CIAM || Boolean(getStoredBackendToken());
+        const storedToken = sessionStorage.getItem("bypassToken");
+        const isCIAMUser = !!storedToken;
         const matchesLoggedInUser = (doc) => {
           if (!email) return false;
           const docEmail = doc.doctor_email?.toLowerCase() || "";
@@ -184,7 +183,7 @@ const DoctorMultiSelect = ({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setDropdownOpen((prev) => !prev)}
-        className="flex items-center justify-between w-64 h-10 border border-gray-300 rounded-md px-4 text-sm bg-white shadow-sm hover:border-blue-500 cursor-pointer select-none"
+        className="flex items-center justify-between w-[clamp(120px,12vw,256px)] h-10 border border-gray-300 rounded-md px-3 text-sm bg-white shadow-sm hover:border-blue-500 cursor-pointer select-none"
       >
         <span>{getPlaceholder()}</span>
         <ChevronDown className="w-4 h-4 text-gray-600" />

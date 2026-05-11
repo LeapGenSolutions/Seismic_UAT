@@ -160,7 +160,7 @@ const AppointmentModal = ({
     const type = isOnline ? "online" : "inperson";
 
     navigate(
-      `/meeting-room/${appt.id}?patient=${encodeURIComponent(appt.full_name)}&type=${type}`
+      `/meeting-room/${appt.id}?patient=${encodeURIComponent(appt.full_name)}&patientEmail=${encodeURIComponent(appt.email)}&firstName=${encodeURIComponent(appt.first_name)}&lastName=${encodeURIComponent(appt.last_name)}&type=${type}`
     );
   };
 
@@ -187,10 +187,9 @@ const AppointmentModal = ({
             <div className="flex gap-4">
               {canEdit && (
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon"
                   onClick={() => setShowEditModal(true)}
-                  className="text-gray-700 hover:text-blue-600 transition"
+                  className="text-gray-700 hover:text-blue-600 h-8 w-8"
                   title="Edit Appointment"
                 >
                   <Pencil size={20} strokeWidth={1.8} />
@@ -199,10 +198,9 @@ const AppointmentModal = ({
 
               {canCancel && (
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon"
                   onClick={() => setShowCancelModal(true)}
-                  className="text-yellow-600 hover:text-yellow-800 transition"
+                  className="text-yellow-600 hover:text-yellow-800 h-8 w-8"
                   title="Cancel Appointment"
                 >
                   <XCircle size={20} strokeWidth={1.8} />
@@ -211,10 +209,9 @@ const AppointmentModal = ({
 
               {!selectedAppointment.seismified && canDeleteAppointments && (
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon"
                   onClick={() => setShowDeleteModal(true)}
-                  className="text-red-500 hover:text-red-700 transition"
+                  className="text-red-500 hover:text-red-700 h-8 w-8"
                   title="Delete Appointment"
                 >
                   <Trash2 size={20} strokeWidth={1.8} />
@@ -229,7 +226,7 @@ const AppointmentModal = ({
               <span className="font-semibold">Patient:</span>{" "}
               {canViewPatientReports ? (
                 <Link
-                  to={`/patients/${selectedAppointment.athena_patient_id || selectedAppointment.patient_id || selectedAppointment.patientId || selectedAppointment.id}`}
+                  to={`/patients/${selectedAppointment.patient_id}`}
                   target="_blank"
                   className="text-blue-600 hover:underline hover:text-blue-800 transition-colors"
                 >
@@ -266,26 +263,22 @@ const AppointmentModal = ({
               {showDOB ? (
                 <>
                   <span>{formattedDOB}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => setShowDOB(false)}
-                    className="h-auto px-0 py-0 text-blue-600 hover:bg-transparent hover:text-blue-700"
+                    className="text-blue-600 hover:underline text-sm"
                   >
                     Hide DOB
-                  </Button>
+                  </button>
                 </>
               ) : (
                 <>
                   <span>{maskedDOB}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => setShowDOB(true)}
-                    className="h-auto px-0 py-0 text-blue-600 hover:bg-transparent hover:text-blue-700"
+                    className="text-blue-600 hover:underline text-sm"
                   >
                     Show DOB
-                  </Button>
+                  </button>
                 </>
               )}
             </p>
@@ -311,7 +304,7 @@ const AppointmentModal = ({
                     <p className="pt-2 font-semibold text-gray-700">Meeting Link:</p>
                     <div className="flex w-full">
                       <input type="text" value={joinLink} readOnly className="flex-grow border border-gray-300 rounded-l-md px-4 py-2" />
-                      <Button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-l-none rounded-r-md">
+                      <Button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700 text-white rounded-l-none rounded-r-md">
                         <FaCopy />
                       </Button>
                     </div>
@@ -321,27 +314,26 @@ const AppointmentModal = ({
             )}
           </div>
 
-          <div className="mt-6 text-right space-x-1">
+          <div className="mt-6 text-right space-x-2">
             {isNotCancelled && canJoinCall && (
-              <Button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white font-medium">Join</Button>
+              <Button onClick={handleJoinClick} className="bg-blue-600 hover:bg-blue-700 text-white">Join</Button>
             )}
 
             {canViewPostCall && (
               <Button
                 onClick={handlePostCallClick}
                 disabled={!selectedAppointment.seismified}
-                className={`py-2 px-4 rounded font-medium ${
+                className={
                   selectedAppointment.seismified
                     ? "bg-zinc-600 hover:bg-zinc-700 text-white"
                     : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                }`}
+                }
               >
                 Post Call Documentation
               </Button>
             )}
 
             <Button
-              variant="destructive"
               onClick={() => setSelectedAppointment(null)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
