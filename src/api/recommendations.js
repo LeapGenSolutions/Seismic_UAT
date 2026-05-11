@@ -8,7 +8,7 @@ export const fetchRecommendationByAppointment = async (apptId, userID) => {
   return response.json();
 };
 
-export const postRecommendationsToAthena = async (apptId, email, textPayload, encounterId, patientId) => {
+export const postRecommendationsToAthena = async (apptId, email, textPayload, encounterId, practiceID) => {
   const response = await fetch(`${BACKEND_URL}/api/athena/${email}/encounter/${encounterId}/post-recommendations`, {
     method: 'PUT',
     headers: {
@@ -16,7 +16,7 @@ export const postRecommendationsToAthena = async (apptId, email, textPayload, en
     },
     body: JSON.stringify({
       id: `${email}_${apptId}_recommendations`,
-      patientId: patientId,
+      practiceID: practiceID,
       patientinstructions: textPayload
     }), 
   });
