@@ -7,6 +7,14 @@ import {
 
 const apiBase = () => BACKEND_URL.replace(/\/+$/, "");
 
+const clientTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+};
+
 const authHeaders = () => {
   const backendToken =
     typeof window !== "undefined" ? (sessionStorage.getItem("backendToken") || "").trim() : "";
@@ -32,6 +40,7 @@ export async function fetchBaaStatus() {
 
 export async function signCurrentBaa({ signerName, manualSignature } = {}) {
   const signedAt = new Date().toISOString();
+  const signedTimeZone = clientTimeZone();
   const response = await fetch(`${apiBase()}/api/standalone/baa/sign`, {
     method: "POST",
     headers: {
@@ -42,6 +51,7 @@ export async function signCurrentBaa({ signerName, manualSignature } = {}) {
       baaAccepted: true,
       baaVersion: CURRENT_BAA_VERSION,
       baaSignedAt: signedAt,
+      baaSignedTimeZone: signedTimeZone,
       baaSignerName: signerName,
       baaManualSignature: manualSignature || "",
       baaAgreementTitle: BAA_AGREEMENT_TITLE,
@@ -51,6 +61,7 @@ export async function signCurrentBaa({ signerName, manualSignature } = {}) {
         signerName,
         manualSignature: manualSignature || "",
         signedAt,
+        signedTimeZone,
         agreementTitle: BAA_AGREEMENT_TITLE,
         agreementText: BAA_AGREEMENT_TEXT,
       },
