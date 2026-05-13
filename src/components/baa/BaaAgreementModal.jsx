@@ -156,7 +156,7 @@ export default function BaaAgreementModal({
                 {BAA_AGREEMENT_TITLE}
               </h2>
               <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">
-                Review the agreement, then sign with your legal name.
+                Please review and accept the clinical data and privacy terms to continue setup.
               </p>
             </div>
           </div>
