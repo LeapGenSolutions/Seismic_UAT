@@ -393,7 +393,6 @@ export default function ProfileTab({ profileData, setProfileData }) {
               }
               className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="never">Never purge transcripts</option>
               <option value="1">1 day</option>
               <option value="7">7 days</option>
               <option value="30">30 days</option>
