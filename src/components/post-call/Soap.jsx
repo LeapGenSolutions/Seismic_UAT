@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "../ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { fetchSoapNotes, updateSoapNotes, postToAthena, getEncounterId } from "../../api/soap";
+import { fetchSoapNotes, updateSoapNotes, postToAthena, getEncounterId, addPatientIdAndEncounterIdToSOAPNotes } from "../../api/soap";
 import LoadingCard from "./LoadingCard";
 import SubjectiveSection from "./sections/SubjectiveSection";
 import ObjectiveSection from "./sections/ObjectiveSection";
@@ -449,6 +449,20 @@ const Soap = ({
     }
     getEncounterID();
   }, [appointmentId, appointment, username, isAthenaAppointment]);
+
+  useEffect(() => {
+    const addPatientAndEncounterIds = async () => {
+      if(!isAthenaAppointment || appointment?.EMR === undefined) return;
+      if(data?.ehr_patient_id && data?.ehr_encounter_id){
+        return;
+      }
+      const response = await addPatientIdAndEncounterIdToSOAPNotes(appointmentId, username, encounterId, appointment?.athena_patient_id);
+      if(response?.success === true) {
+        console.log("Successfully added patient and encounter IDs to SOAP notes");
+      }
+    }
+    addPatientAndEncounterIds();
+  }, [encounterId, appointmentId, username, appointment, isAthenaAppointment, data]);
 
   useEffect(() => {
     if (!data?.data?.soap_notes || isLoading) return;

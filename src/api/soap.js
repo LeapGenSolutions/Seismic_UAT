@@ -46,6 +46,26 @@ export const updateSoapNotes = async (apptId, username, updatedNotes) => {
   return response.json();
 };
 
+export const addPatientIdAndEncounterIdToSOAPNotes = async (appid, username, encounterId, patientId) => {
+  const encodedUser = encodeURIComponent(username);
+  const soapId = `${username}_${appid}_soap`;
+
+  const response = await fetch(`${BACKEND_URL}api/soap-notes/${soapId}/${patientId}/${encounterId}?username=${encodedUser}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const data = await response.json();
+
+  if(!data.success) {
+    console.log("Failed to add patient and encounter IDs to SOAP notes:", data.error);
+  }
+
+  return data;
+}
+
 export const postToAthena = async (data) => {
   if(data.type === "Chief Complaint") {
     return await postVisitReason(data.username, data.athena_encounter_id, data.content, data.practiceID);
