@@ -313,7 +313,7 @@ const PostCallDocumentation = ({ onSave }) => {
           )}
 
           {docTab === "recommendations" && (
-            <Reccomendations username={resolvedUsername} appointmentId={callId} />
+            <Reccomendations username={resolvedUsername} appointmentId={callId} appointment={selectedAppointment} />
           )}
 
           {docTab === "billing" && (

@@ -113,7 +113,7 @@ const PostIconButton = ({
           ? "Already posted"
           : isFailed
           ? "Retry post"
-          : "Post to Athena"
+          : "Post to EHR"
       }
     >
       {icon}

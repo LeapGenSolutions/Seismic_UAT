@@ -26,7 +26,6 @@ const ChatbotWindow = () => {
     const loggedInDoctor = useSelector((state) => state.me.me);
     const doctors = useSelector((state) => state.doctors?.doctors || []);
     const doctorinfo = doctors.find(doc => doc.email === loggedInDoctor?.email || doc.doctor_email === loggedInDoctor?.email);
-    console.log("Doctor info for chatbot token:", doctorinfo);
     const fetchToken = useCallback(async () => {
         try{
             const response = await fetch(`${BACKEND_URL}/api/chat-bot/get-token`, {

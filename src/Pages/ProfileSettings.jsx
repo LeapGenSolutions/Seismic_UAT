@@ -16,7 +16,6 @@ export default function ProfileSettings() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("profile");
   const me = useSelector((state) => state.me.me);
-
   useEffect(() => {
     document.title = "Profile & Settings - Seismic Connect";
 
@@ -46,6 +45,8 @@ export default function ProfileSettings() {
           lastLogin: new Date().toISOString(),
           notifications: me.notifications || { email: true, sms: false },
           timeZone: me.timeZone || "America/Los_Angeles",
+          transcript_purging_time : me.transcript_purging_time || "never",
+          enable_transcript_purging : me.enable_transcript_purging || "no",
           security: {
             authenticationMethod: "Single sign-on",
             passwordManagedBy: "Clinic identity provider",
@@ -59,7 +60,7 @@ export default function ProfileSettings() {
 
   if (loading) {
     return (
-      <div className="space-y-4 px-2 pb-4">
+      <div className="space-y-4 px-2 pb-4 h-full overflow-y-auto">
         <PageNavigation title="My Profile" />
         <Skeleton className="h-[520px] w-full rounded-xl" />
       </div>
@@ -67,7 +68,7 @@ export default function ProfileSettings() {
   }
 
   return (
-    <div className="space-y-4 px-2 pb-4">
+    <div className="space-y-4 px-2 pb-4 h-full overflow-y-auto">
       <PageNavigation
         title="Profile & Settings"
         subtitle="Review your registered details and legal acknowledgements."
