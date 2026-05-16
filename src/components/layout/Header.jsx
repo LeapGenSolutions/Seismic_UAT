@@ -1,20 +1,26 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, User, Settings, ChevronDown } from "lucide-react";
+import { Bell, User, Settings, ChevronDown, Map } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Link, useLocation } from "wouter";
 import { normalizeRole } from "../../lib/rbac";
 import { resolveUserNameParts } from "../../lib/userName";
 import { Button } from "../ui/button";
+import { useTour } from "../tour/TourProvider";
 
 const Header = () => {
   const [location] = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const user = useSelector((state) => state.me.me);
+  const { startTour, tour } = useTour();
   const displayRole = normalizeRole(user?.role) || "Staff";
   const { firstName, fullName } = resolveUserNameParts(user || {});
 
   const isActive = (path) => location === path;
+
+  const handleStartTour = () => {
+    startTour();
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -88,6 +94,19 @@ const Header = () => {
 
         {/* --- Right: Bell + Avatar --- */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 pl-2">
+          <Button
+            type="button"
+            variant="outline"
+            data-flow-control
+            onClick={handleStartTour}
+            aria-label={tour.active ? "Open tour assistant" : "Start guided tour"}
+            className="h-9 rounded-md border-emerald-200 bg-emerald-50 px-2.5 text-emerald-800 shadow-none hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-900 sm:px-3"
+          >
+            <Map className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">
+              {tour.active ? "Tour Active" : "Start Tour"}
+            </span>
+          </Button>
 
           {/* Clinic Name */}
           {user?.clinicName && (

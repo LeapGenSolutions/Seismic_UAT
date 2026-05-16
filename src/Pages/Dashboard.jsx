@@ -46,13 +46,19 @@ function Dashboard() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <HasPermission required="dashboard.todays_schedule" level="read">
-          <AppointmentStats date={todayISO} />
+          <div data-tour="dashboard-schedule">
+            <AppointmentStats date={todayISO} />
+          </div>
         </HasPermission>
         <HasPermission required="dashboard.status_overview" level="read">
-          <AppointmentStatus date={todayISO} />
+          <div data-tour="dashboard-status">
+            <AppointmentStatus date={todayISO} />
+          </div>
         </HasPermission>
         <HasPermission required="dashboard.provider_workload" level="read">
-          <ProviderWorkload date={todayISO} />
+          <div data-tour="dashboard-workload">
+            <ProviderWorkload date={todayISO} />
+          </div>
         </HasPermission>
       </div>
     </div>

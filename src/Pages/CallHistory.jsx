@@ -192,6 +192,7 @@ function CallHistory() {
 
   return (
     <div className="space-y-6">
+      <div data-tour="call-history-filters">
       {/* Title */}
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-gray-900">
@@ -243,6 +244,7 @@ function CallHistory() {
         >
           Reset Filters
         </button>
+      </div>
       </div>
 
       {/* Results */}

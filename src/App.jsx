@@ -6,6 +6,8 @@ import { Provider, useDispatch, useSelector } from "react-redux";
 import { Toaster } from "./components/ui/toaster";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
+import FlowNavigationGuard from "./components/layout/FlowNavigationGuard";
+import TourProvider from "./components/tour/TourProvider";
 import AuthorizedRoute from "./components/auth/AuthorizedRoute";
 import AccessDenied from "./components/auth/AccessDenied";
 import PostCallDocumentation from "./Pages/PostCallDocumentation";
@@ -123,11 +125,13 @@ function Router() {
   ];
 
   return (
-    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
-      {!isPatientView && <Sidebar />}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-neutral-50 p-3 sm:p-4 lg:p-6">
+    <TourProvider>
+      <div className="h-screen flex flex-col md:flex-row overflow-hidden">
+        {!isPatientView && <Sidebar />}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <FlowNavigationGuard />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-neutral-50 p-3 sm:p-4 lg:p-6">
           <Switch>
             <Route path="/about" component={AboutUs} />
             <Route path="/about/details" component={AboutSeismic} />
@@ -307,10 +311,11 @@ function Router() {
             />
             <Route component={NotFound} />
           </Switch>
-          <ChatbotWindow />
-        </main>
+            <ChatbotWindow />
+          </main>
+        </div>
       </div>
-    </div>
+    </TourProvider>
   );
 }
 

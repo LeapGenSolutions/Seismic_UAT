@@ -131,6 +131,7 @@ function NavigationGuideAccordion() {
                 </li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-dashboard-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -196,6 +197,7 @@ function NavigationGuideAccordion() {
                 </li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-appointments-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -261,6 +263,7 @@ function NavigationGuideAccordion() {
                 </li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-videocall-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -326,6 +329,7 @@ function NavigationGuideAccordion() {
                 </li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-patients-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -391,6 +395,7 @@ function NavigationGuideAccordion() {
                 </li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-reports-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -455,6 +460,7 @@ function NavigationGuideAccordion() {
                 <li>Read announcements and changelogs</li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-connect-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}
@@ -506,6 +512,7 @@ function NavigationGuideAccordion() {
                 <li>Find our support email and emergency line</li>
               </ul>
               <button
+                data-app-navigation
                 id="explore-contactus-btn"
                 className="mt-8 px-5 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition text-sm"
                 style={{ display: 'none' }}

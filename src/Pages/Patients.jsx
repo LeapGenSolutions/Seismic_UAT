@@ -30,6 +30,7 @@ import { checkAppointments } from "../api/callHistory";
 import { formatUsDate } from "../lib/dateUtils";
 import HasPermission from "../components/auth/HasPermission";
 import { useAnyPermission } from "../hooks/use-permission";
+import usePersistentPageState from "../hooks/usePersistentPageState";
 
 const toISODate = (date) => {
   const year = date.getFullYear();
@@ -107,15 +108,15 @@ function Patients() {
 
   const today = toISODate(new Date());
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = usePersistentPageState("searchQuery", "");
+  const [showAdvancedSearch, setShowAdvancedSearch] = usePersistentPageState("showAdvancedSearch", false);
   const [basePatients, setBasePatients] = useState([]);
   const [showPatients, setShowPatients] = useState([]);
 
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const [appointmentFilters, setAppointmentFilters] = useState({
+  const [appointmentFilters, setAppointmentFilters] = usePersistentPageState("appointmentFilters", {
     selectedDoctors: loggedInDoctor?.doctor_email
       ? [loggedInDoctor?.doctor_email]
       : [],
@@ -152,7 +153,7 @@ function Patients() {
         selectedDoctors: [loggedInDoctor.doctor_email],
       }));
     }
-  }, [appointmentFilters.selectedDoctors, loggedInDoctor]);
+  }, [appointmentFilters.selectedDoctors, loggedInDoctor, setAppointmentFilters]);
 
   useEffect(() => {
     if (appointmentFilters.selectedDoctors.length > 0) {
@@ -329,7 +330,7 @@ function Patients() {
       />
 
 
-      <Card>
+      <Card data-tour="patient-search">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Patient Search</CardTitle>
         </CardHeader>
@@ -388,7 +389,7 @@ function Patients() {
           )}
         </CardContent>
       </Card>
-      <Card>
+      <Card data-tour="appointment-filters">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Appointment Filters</CardTitle>
         </CardHeader>
@@ -439,7 +440,7 @@ function Patients() {
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card data-tour="patients-table">
         <CardContent className="p-0 max-h-[600px] overflow-y-auto">
           <Table>
             <TableHeader className="bg-gray-50 sticky top-0 z-10">
@@ -521,6 +522,7 @@ function Patients() {
                       <TableCell className="text-right whitespace-nowrap">
                         {canViewPatientReports ? (
                           <Link
+                            data-tour="view-patient-reports"
                             href={`/patients/${p.patient_id}`}
                             title="View Patient Reports"
                             className="inline-flex items-center justify-center text-blue-600"

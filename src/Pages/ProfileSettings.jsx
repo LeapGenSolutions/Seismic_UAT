@@ -3,11 +3,14 @@ import { PageNavigation } from "../components/ui/page-navigation";
 import { Skeleton } from "../components/ui/skeleton";
 import ProfileTab from "../components/profile/ProfileTab";
 import LegalTab from "../components/profile/LegalTab";
+import PreferencesTab from "../components/profile/PreferencesTab";
 import { useSelector } from "react-redux";
 import { resolveUserNameParts } from "../lib/userName";
+import { getGuidedTourPreferences } from "../lib/guidedTours";
 
 const TAB_OPTIONS = [
   { id: "profile", label: "My Profile" },
+  { id: "preferences", label: "Preferences" },
   { id: "legal", label: "Legal Acknowledgements" },
 ];
 
@@ -45,6 +48,7 @@ export default function ProfileSettings() {
           lastLogin: new Date().toISOString(),
           notifications: me.notifications || { email: true, sms: false },
           timeZone: me.timeZone || "America/Los_Angeles",
+          guidedTours: me.guidedTours || getGuidedTourPreferences(),
           transcript_purging_time : me.transcript_purging_time || "never",
           enable_transcript_purging : me.enable_transcript_purging || "no",
           security: {
@@ -92,6 +96,7 @@ export default function ProfileSettings() {
 
       <div className="focus-visible:outline-none focus-visible:ring-0">
         {activeTab === "profile" && <ProfileTab profileData={profileData} setProfileData={setProfileData} />}
+        {activeTab === "preferences" && <PreferencesTab profileData={profileData} setProfileData={setProfileData} />}
         {activeTab === "legal" && <LegalTab profileData={profileData} />}
       </div>
     </div>

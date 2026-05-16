@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Save, Bell, Globe } from "lucide-react";
+import { Save, Bell, Globe, Map, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
@@ -7,15 +7,25 @@ import { Checkbox } from "../ui/checkbox";
 import { useToast } from "../../hooks/use-toast";
 import { BACKEND_URL } from "../../constants";
 import { getSessionAuthToken } from "../../api/auth";
+import { useTour } from "../tour/TourProvider";
+import {
+  DEFAULT_GUIDED_TOUR_ID,
+  getGuidedTour,
+  getGuidedTourPreferences,
+  saveGuidedTourPreferences,
+} from "../../lib/guidedTours";
 
 export default function PreferencesTab({ profileData, setProfileData }) {
   const { toast } = useToast();
+  const { startTour, stopTour, tour: contextualTour } = useTour();
   const token = getSessionAuthToken(); 
+  const tour = getGuidedTour(DEFAULT_GUIDED_TOUR_ID);
   
   const [formData, setFormData] = useState({
     email: profileData?.notifications?.email ?? true,
     sms: profileData?.notifications?.sms ?? false,
     timeZone: profileData?.timeZone || "America/Los_Angeles",
+    guidedToursEnabled: profileData?.guidedTours?.enabled ?? getGuidedTourPreferences().enabled,
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -33,6 +43,7 @@ export default function PreferencesTab({ profileData, setProfileData }) {
       email: profileData?.notifications?.email ?? true,
       sms: profileData?.notifications?.sms ?? false,
       timeZone: profileData?.timeZone || "America/Los_Angeles",
+      guidedToursEnabled: profileData?.guidedTours?.enabled ?? getGuidedTourPreferences().enabled,
     });
   }, [profileData]);
 
@@ -47,6 +58,13 @@ export default function PreferencesTab({ profileData, setProfileData }) {
   const handleSave = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    const savedGuidedTours = saveGuidedTourPreferences({
+      enabled: formData.guidedToursEnabled
+    });
+
+    if (!formData.guidedToursEnabled) {
+      stopTour();
+    }
     
     try {
       const response = await fetch(`${BACKEND_URL}/api/standalone/profile/preferences`, {
@@ -74,7 +92,8 @@ export default function PreferencesTab({ profileData, setProfileData }) {
           email: formData.email,
           sms: formData.sms
         },
-        timeZone: formData.timeZone
+        timeZone: formData.timeZone,
+        guidedTours: savedGuidedTours
       }));
 
       toast({
@@ -82,15 +101,33 @@ export default function PreferencesTab({ profileData, setProfileData }) {
         description: "Your notification and system preferences have been updated.",
       });
     } catch (error) {
+      setProfileData((prev) => ({
+        ...prev,
+        guidedTours: savedGuidedTours
+      }));
+
       toast({
         title: "Error saving preferences",
-        description: "Please try again later.",
+        description: "Tour preferences were saved locally, but notification preferences could not be updated.",
         variant: "destructive"
       });
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleRestartTour = () => {
+    const preferences = saveGuidedTourPreferences({ enabled: true });
+    setFormData((prev) => ({ ...prev, guidedToursEnabled: true }));
+    setProfileData((prev) => ({
+      ...prev,
+      guidedTours: preferences,
+    }));
+
+    startTour();
+  };
+
+  const currentTourStatus = contextualTour.active ? "active" : "not active";
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
@@ -134,6 +171,53 @@ export default function PreferencesTab({ profileData, setProfileData }) {
                 Receive urgent alerts and schedule changes directly to your registered mobile device.
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Map className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-base">Guided Tours</CardTitle>
+          </div>
+          <CardDescription>
+            Control walkthrough prompts and restart the main product tour.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="guided-tours-enabled"
+              checked={formData.guidedToursEnabled}
+              onCheckedChange={(c) => handleToggle("guidedToursEnabled", Boolean(c))}
+            />
+            <div className="space-y-1 leading-none">
+              <Label htmlFor="guided-tours-enabled" className="cursor-pointer text-sm font-medium">
+                Enable Guided Tours
+              </Label>
+              <p className="text-xs text-gray-500">
+                Show tour guidance and allow guided walkthroughs to continue between sessions.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">{tour.name}</p>
+              <p className="text-xs text-gray-500">
+                Current status: {currentTourStatus}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRestartTour}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Restart Tour
+            </Button>
           </div>
         </CardContent>
       </Card>

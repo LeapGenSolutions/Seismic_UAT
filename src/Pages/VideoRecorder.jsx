@@ -13,6 +13,7 @@ import { Button } from "../components/ui/button";
 import CreateAppointmentModal from "../components/appointments/CreateAppointmentModal";
 import { usePermission } from "../hooks/use-permission";
 import { resolveUserNameParts } from "../lib/userName";
+import usePersistentPageState from "../hooks/usePersistentPageState";
 
 const normalizeNameValue = (value = "") =>
   String(value).replace(/\s+/g, " ").trim();
@@ -45,14 +46,14 @@ const getVideoCallDisplayName = (user = {}) => {
 };
 
 const VideoCallPage = () => {
-  const [room, setRoom] = useState("");
+  const [room, setRoom] = usePersistentPageState("room", "");
   const isHost = useState(true)[0];
   const [showShareLink, setShowShareLink] = useState(false);
   const [joinLink, setJoinLink] = useState("");
 
-  const [activeTab, setActiveTab] = useState("upcoming");
-  const [appointmentId, setAppointmentId] = useState("");
-  const [appointmentType, setAppointmentType] = useState("in-person");
+  const [activeTab, setActiveTab] = usePersistentPageState("activeTab", "upcoming");
+  const [appointmentId, setAppointmentId] = usePersistentPageState("appointmentId", "");
+  const [appointmentType, setAppointmentType] = usePersistentPageState("appointmentType", "in-person");
   const [seismifiedIds, setSeismifiedIds] = useState([]);
   const isLoadingUpcoming = useState(false)[0];
   const dispatch = useDispatch();
@@ -180,7 +181,7 @@ const VideoCallPage = () => {
     if (activeTab === "history" && !canViewHistory && canViewUpcoming) {
       setActiveTab("upcoming");
     }
-  }, [activeTab, canViewHistory, canViewUpcoming, role]);
+  }, [activeTab, canViewHistory, canViewUpcoming, role, setActiveTab]);
 
   useEffect(() => {
     if (appointmentType === "in-person") {
@@ -306,6 +307,7 @@ const VideoCallPage = () => {
               <div className="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500 mb-4">
                 {role === "doctor" && canViewUpcoming && (
                   <button
+                    data-tour="video-call-upcoming-tab"
                     onClick={() => setActiveTab("upcoming")}
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${activeTab === "upcoming"
                       ? "bg-white text-gray-900 shadow-sm"
@@ -330,6 +332,7 @@ const VideoCallPage = () => {
 
                 {role === "doctor" && canViewHistory && (
                   <button
+                    data-tour="video-call-history-tab"
                     onClick={() => setActiveTab("history")}
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${activeTab === "history"
                       ? "bg-white text-gray-900 shadow-sm"
@@ -344,7 +347,7 @@ const VideoCallPage = () => {
               {/* Upcoming tab */}
               {activeTab === "upcoming" && canViewUpcoming && (
                 <div className="space-y-4">
-                  <div className="grid gap-2">
+                  <div data-tour="upcoming-appointment-select" className="grid gap-2">
                     <label
                       htmlFor="appointment"
                       className="text-sm font-medium text-gray-700"
@@ -453,6 +456,7 @@ const VideoCallPage = () => {
                       <label className="block text-gray-700 mb-2 flex-1">
                         Your Name
                         <input
+                          data-tour="upcoming-your-name"
                           type="text"
                           placeholder="Enter your name"
                           value={userName}

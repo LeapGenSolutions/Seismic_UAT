@@ -18,6 +18,7 @@ export function PageNavigation({
         <div className="flex-shrink-0">
           {showBackButton && (
             <button
+              data-app-navigation
               onClick={() => window.history.back()}
               className="inline-flex items-center px-3 py-1.5 text-sm font-medium 
                 text-white bg-blue-600 border border-blue-700 rounded-lg 

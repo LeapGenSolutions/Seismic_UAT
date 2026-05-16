@@ -145,7 +145,7 @@ const Sidebar = () => {
             <Menu className="w-6 h-6" />
           </button>
 
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
+          <div data-app-navigation className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
             <Logo size="small" />
             <h1 className="text-lg font-semibold">Seismic Connect</h1>
           </div>
@@ -160,7 +160,7 @@ const Sidebar = () => {
                 <Menu className="w-5 h-5" />
               </button>
 
-              <div className="flex gap-3 cursor-pointer" onClick={() => navigate("/")}>
+              <div data-app-navigation className="flex gap-3 cursor-pointer" onClick={() => navigate("/")}>
                 <Logo size="medium" />
                 <div className="flex flex-col leading-tight">
                   <span className="text-xl font-semibold">Seismic</span>

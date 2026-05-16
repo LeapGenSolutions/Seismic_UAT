@@ -16,9 +16,12 @@ import CallFeedback from "../components/post-call/PostCallFeedback";
 import { fetchCallHistory, fetchDoctorsFromHistory } from "../api/callHistory";
 import { fetchAppointmentDetails } from "../redux/appointment-actions";
 import { useAnyPermission, usePermission } from "../hooks/use-permission";
+import usePersistentPageState from "../hooks/usePersistentPageState";
 
 const PostCallDocumentation = ({ onSave }) => {
-  const [docTab, setDocTab] = useState("summary");
+  const [docTab, setDocTab] = usePersistentPageState("docTab", "summary", {
+    scope: "post-call-documentation",
+  });
   const { callId } = useParams();
   const [prevPage, setPrevPage] = useState(null);
   const dispatch = useDispatch();
@@ -199,11 +202,11 @@ const PostCallDocumentation = ({ onSave }) => {
     if (!hasCurrentTab) {
       setDocTab(documentationTabs[0].id);
     }
-  }, [docTab, documentationTabs]);
+  }, [docTab, documentationTabs, setDocTab]);
 
   return (
     <>
-      <div className="flex justify-between items-start mb-4">
+      <div data-tour="post-call-header" className="flex justify-between items-start mb-4">
         {prevPage !== "video-call" && (
           <button
             onClick={handleback}
@@ -215,7 +218,7 @@ const PostCallDocumentation = ({ onSave }) => {
         )}
 
         {canManageFeedback && (
-          <div className="ml-auto">
+          <div data-tour="post-call-feedback" className="ml-auto">
             <CallFeedback username={resolvedUsername} appointmentId={callId} />
           </div>
         )}
@@ -227,7 +230,10 @@ const PostCallDocumentation = ({ onSave }) => {
         </CardHeader>
 
         {selectedAppointment && (
-          <div className="bg-white border border-gray-300 rounded-xl shadow p-6 mb-6 mx-6 md:mx-auto md:max-w-5xl">
+          <div
+            data-tour="post-call-patient-info"
+            className="bg-white border border-gray-300 rounded-xl shadow p-6 mb-6 mx-6 md:mx-auto md:max-w-5xl"
+          >
             <h2 className="text-2xl font-semibold mb-4 text-gray-700">Patient Info</h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-gray-800">
@@ -268,10 +274,11 @@ const PostCallDocumentation = ({ onSave }) => {
         )}
 
         <CardContent>
-          <div className="mb-6 flex flex-wrap justify-center gap-2">
+          <div data-tour="post-call-tabs" className="mb-6 flex flex-wrap justify-center gap-2">
             {documentationTabs.map((tab) => (
               <button
                 key={tab.id}
+                data-tour={`post-call-tab-${tab.id}`}
                 className={`px-4 py-2 rounded-md font-medium transition ${
                   docTab === tab.id
                     ? "bg-blue-600 text-white shadow-sm"
@@ -284,66 +291,68 @@ const PostCallDocumentation = ({ onSave }) => {
             ))}
           </div>
 
-          {docTab === "summary" && (
-            <Summary
-              username={resolvedUsername}
-              appointmentId={callId}
-              patientId={
-                selectedAppointment?.patient_id ||
-                selectedAppointment?.patient_Id ||
-                selectedAppointment?.patientId ||
-                selectedAppointment?.mrn ||
-                selectedAppointment?.patient_mrn
-              }
-            />
-          )}
+          <div data-tour="post-call-content">
+            {docTab === "summary" && (
+              <Summary
+                username={resolvedUsername}
+                appointmentId={callId}
+                patientId={
+                  selectedAppointment?.patient_id ||
+                  selectedAppointment?.patient_Id ||
+                  selectedAppointment?.patientId ||
+                  selectedAppointment?.mrn ||
+                  selectedAppointment?.patient_mrn
+                }
+              />
+            )}
 
-          {docTab === "transcript" && (
-            <Transcript username={resolvedUsername} appointmentId={callId} />
-          )}
+            {docTab === "transcript" && (
+              <Transcript username={resolvedUsername} appointmentId={callId} />
+            )}
 
-          {docTab === "soap" && (
-            <Soap
-              username={resolvedUsername}
-              appointmentId={callId}
-              appointment={selectedAppointment}
-              canEdit={canEditSoap}
-              canPostToAthena={canEditSoap}
-            />
-          )}
+            {docTab === "soap" && (
+              <Soap
+                username={resolvedUsername}
+                appointmentId={callId}
+                appointment={selectedAppointment}
+                canEdit={canEditSoap}
+                canPostToAthena={canEditSoap}
+              />
+            )}
 
-          {docTab === "recommendations" && (
-            <Reccomendations username={resolvedUsername} appointmentId={callId} appointment={selectedAppointment} />
-          )}
+            {docTab === "recommendations" && (
+              <Reccomendations username={resolvedUsername} appointmentId={callId} appointment={selectedAppointment} />
+            )}
 
-          {docTab === "billing" && (
-            <Billing
-              username={resolvedUsername}
-              appointmentId={callId}
-              canEdit={canEditBilling}
-            />
-          )}
+            {docTab === "billing" && (
+              <Billing
+                username={resolvedUsername}
+                appointmentId={callId}
+                canEdit={canEditBilling}
+              />
+            )}
 
-          {docTab === "clusters" && (
-            <Clusters username={resolvedUsername} appointmentId={callId} />
-          )}
+            {docTab === "clusters" && (
+              <Clusters username={resolvedUsername} appointmentId={callId} />
+            )}
 
-          {docTab === "doctorNotes" && (
-            <DoctorNotes
-              username={resolvedUsername}
-              appointmentId={callId}
-              canCreate={canCreateDoctorNotes}
-              canEditExisting={canEditDoctorNotes}
-            />
-          )}
+            {docTab === "doctorNotes" && (
+              <DoctorNotes
+                username={resolvedUsername}
+                appointmentId={callId}
+                canCreate={canCreateDoctorNotes}
+                canEditExisting={canEditDoctorNotes}
+              />
+            )}
 
-          {docTab === "emotionalConnect" && selectedAppointment && (
-            <EmotionalConnect
-              username={resolvedUsername}
-              appointmentId={callId}
-              appointment={selectedAppointment}
-            />
-          )}
+            {docTab === "emotionalConnect" && selectedAppointment && (
+              <EmotionalConnect
+                username={resolvedUsername}
+                appointmentId={callId}
+                appointment={selectedAppointment}
+              />
+            )}
+          </div>
 
         </CardContent>
       </Card>

@@ -14,6 +14,7 @@ import CreateBulkAppointments from "./createBulkAppointments";
 import { usePermission } from "../../hooks/use-permission";
 import { useToast } from "../../hooks/use-toast";
 import { getColorFromName } from "../../constants/colors";
+import usePersistentPageState from "../../hooks/usePersistentPageState";
 
 function capitalizeFirst(str = "") {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -36,9 +37,9 @@ const localizer = dateFnsLocalizer({
 });
 
 const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = usePersistentPageState("selectedAppointment", null);
   const [appointments, setAppointments] = useState([]);
-  const [selectedDoctors, setSelectedDoctors] = useState([]);
+  const [selectedDoctors, setSelectedDoctors] = usePersistentPageState("selectedDoctors", []);
   const [doctorColorMap, setDoctorColorMap] = useState({});
   const [isSelectionInitialized, setIsSelectionInitialized] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
@@ -46,7 +47,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBulkCreateModal, setShowBulkCreateModal] = useState(false);
 
-  const [currentView, setCurrentView] = useState("day");
+  const [currentView, setCurrentView] = usePersistentPageState("currentView", "day");
 
   const loggedInDoctor = useSelector((state) => state.me.me);
   const canSelectProviders = usePermission("appointments.select_providers", "read");
@@ -57,7 +58,25 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
   }, [onAdd, onAddBulk]);
 
   useEffect(() => {
+    if (isSelectionInitialized) {
+      return;
+    }
+
     const email = (loggedInDoctor?.email || "").trim().toLowerCase();
+
+    if (selectedDoctors.length > 0) {
+      setDoctorColorMap((current) =>
+        selectedDoctors.reduce(
+          (nextMap, doctorEmail) => ({
+            ...nextMap,
+            [doctorEmail]: nextMap[doctorEmail] || getColorFromName(doctorEmail),
+          }),
+          current
+        )
+      );
+      setIsSelectionInitialized(true);
+      return;
+    }
 
     // Always default the initial selection to the logged-in clinician's email
     // for a safe, personalized starting view.
@@ -70,7 +89,13 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     }
 
     setIsSelectionInitialized(true);
-  }, [loggedInDoctor?.email, loggedInDoctor?.clinicName, isSelectionInitialized]);
+  }, [
+    loggedInDoctor?.email,
+    loggedInDoctor?.clinicName,
+    isSelectionInitialized,
+    selectedDoctors,
+    setSelectedDoctors,
+  ]);
 
   useEffect(() => {
     if (canSelectProviders) {
@@ -83,7 +108,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     } else {
       setSelectedDoctors(["__none__"]);
     }
-  }, [canSelectProviders, loggedInDoctor?.email]);
+  }, [canSelectProviders, loggedInDoctor?.email, setSelectedDoctors]);
 
   const applySeismified = useCallback(async (list) => {
     const ids = (Array.isArray(list) ? list : [])
@@ -332,7 +357,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
     });
 
     setDoctorColorMap(colorMap);
-  }, []);
+  }, [setSelectedDoctors]);
 
   const handleAppointmentUpdated = useCallback((updated) => {
     const [hours, minutes] = updated.time.split(":").map(Number);
@@ -497,7 +522,7 @@ const AppointmentCalendar = ({ onAdd, onAddBulk }) => {
   }
 
   return (
-    <div style={{ height: "650px", margin: "20px" }}>
+    <div data-tour="appointment-calendar" style={{ height: "650px", margin: "20px" }}>
       {isCalendarLoading ? (
         <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
           Refreshing appointments...

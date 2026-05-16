@@ -145,7 +145,7 @@ const CustomToolbar = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-1 justify-center">
+      <div data-tour="appointment-filters" className="flex items-center gap-3 flex-1 justify-center">
         <div className="relative" ref={viewMenuRef}>
           <button
             onClick={() => setViewMenuOpen((prev) => !prev)}
@@ -199,6 +199,7 @@ const CustomToolbar = ({
 
         <div className="relative" ref={addMenuRef}>
           <Button
+            data-tour="add-appointment-button"
             disabled={isPastDate() || !canAddAppointment}
             title={
               isPastDate()
