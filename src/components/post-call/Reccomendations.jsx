@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Copy, Check, Send, AlertCircle, CheckCircle2, X } from "lucide-react";
 import LoadingCard from "./LoadingCard";
 import UpToDate from "./UpToDate";
+import { getEncounterId } from "../../api/soap";
 
 // --- REUSABLE BUTTON COMPONENTS (Lucide React) ---
 
@@ -217,6 +218,7 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [postError, setPostError] = useState(false);
+  const [encounterId, setEncounterId] = useState(appointment?.athena_encounter_id || "");
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   
   // Track if notes have already been posted in this session
@@ -260,6 +262,17 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
     [seismicDisplayText]
   );
 
+  useEffect(() => {
+    const getEncounterID = async () => {
+      if(isAthenaAppointment && (appointment?.athena_encounter_id === "" || !appointment?.athena_encounter_id)) {
+        const response = await getEncounterId(appointmentId, username, appointment?.appointment_date, appointment?.athena_practice_id);
+        if(response?.success === true){
+          setEncounterId(response.encounterId);
+        }
+      }
+    }
+    getEncounterID();
+  }, [appointmentId, appointment, username, isAthenaAppointment]);
 
   const handleInitiatePost = () => {
     setPostError(false);
@@ -284,7 +297,7 @@ const Recommendations = ({ appointmentId, username, appointment }) => {
         appointmentId,
         username,
         seismicDisplayText,
-        appointment?.athena_encounter_id,
+        encounterId,
         appointment?.athena_practice_id
       );
 
